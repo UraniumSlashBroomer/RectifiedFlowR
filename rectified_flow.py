@@ -6,15 +6,17 @@ import torch.nn as nn
 class TimeEmbedding(nn.Module):
     def __init__(self, emb_dim):
         super().__init__()
-        self.sincosemb = torch.zeros(size=(1, 1, emb_dim))
+        sincosemb = torch.zeros(size=(1, 1, emb_dim))
         i = torch.arange(0, emb_dim, step=2)
-        self.sincosemb[:, :, i] = torch.sin(10000 ** (-i / emb_dim))
+        sincosemb[:, :, i] = torch.sin(10000 ** (-i / emb_dim))
         i += 1
-        self.sincosemb[:, :, i] = torch.cos(10000 ** (-i / emb_dim)) # [1, 1, E]
+        sincosemb[:, :, i] = torch.cos(10000 ** (-i / emb_dim)) # [1, 1, E]
         
         self.fc1 = nn.Linear(emb_dim, emb_dim)
         self.SiLU = nn.SiLU()
         self.fc2 = nn.Linear(emb_dim, emb_dim)
+
+        self.register_buffer("sincosemb", sincosemb)
 
     def forward(self, t):
         """
@@ -171,18 +173,3 @@ class RectifiedFlowViT(nn.Module):
         imgs = self.unpatchify(x) # [B, C, N, N]
 
         return imgs
-
-    def sample(self, B, T):
-        """
-        input: T: int number, num of steps
-               B: int number, num of samples
-        """
-        sample = torch.randn(B, self.in_channels, self.img_size, self.img_size)
-        t = torch.linspace(0, 1, T)
-        for i in range(len(t) - 1):
-            t_curr = torch.ones(size=(B, 1)) * t[i]
-            dt = t[i + 1] - t[i]
-
-            sample = sample + dt * self.forward(sample, t_curr)
-
-        return sample 

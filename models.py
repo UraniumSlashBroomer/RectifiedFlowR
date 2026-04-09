@@ -28,11 +28,13 @@ class PositionalEncodingSinCos(nn.Module):
         
         self.dropout = nn.Dropout(p_dropout)
 
-        self.pe = torch.zeros(1, max_length, emb_dim)
+        pe = torch.zeros(1, max_length, emb_dim)
 
         for i in range(max_length):
             for j in range(emb_dim):
-                self.pe[:, i, j] = math.sin(i * (10000 ** (-j / emb_dim))) if j % 2 == 0 else math.cos(i * (10000 ** (-(j - 1) / emb_dim)))
+                pe[:, i, j] = math.sin(i * (10000 ** (-j / emb_dim))) if j % 2 == 0 else math.cos(i * (10000 ** (-(j - 1) / emb_dim)))
+
+        self.register_buffer("pe", pe)
 
     def forward(self, x):
         """
