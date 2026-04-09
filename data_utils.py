@@ -1,6 +1,7 @@
 import pickle
 import numpy as np
 import os
+import torch
 from torch.utils.data import DataLoader
 
 def load_CIFAR_batch(filename):
@@ -26,7 +27,7 @@ def load_CIFAR10(root):
     Xte, Yte = load_CIFAR_batch(os.path.join(root, "test_batch"))
     return Xtr, Ytr, Xte, Yte
 
-def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=1000, subtract_mean=True):
+def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=1000, dtype=torch.float32):
     cifar10_dir = os.path.join(
             os.path.dirname(__file__), "dataset/cifar-10-batches-py"
     )
@@ -41,20 +42,20 @@ def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=1000, sub
     mask = [i for i in range(num_test)]
     X_test = X_test[mask]
     y_test = y_test[mask]
-
-    if subtract_mean:
-        mean_image = np.mean(X_train, axis=0)
-        X_train -= mean_image
-        X_val -= mean_image
-        X_test -= mean_image
+    
+    X_train, X_val, X_test = X_train / 255, X_val / 255, X_test / 255 # pixels are in [0, 1] range
+    
+    X_train = 2 * X_train - 1 # [-1, 1]
+    X_val = 2 * X_val - 1
+    X_test = 2 * X_test - 1
 
     result_dict = {
-        "X_train": X_train,
-        "y_train": y_train,
-        "X_val": X_val,
-        "y_val": y_val,
-        "X_test": X_test,
-        "y_test": y_test
+        "X_train": torch.tensor(X_train, dtype=dtype),
+        "y_train": torch.tensor(y_train, dtype=dtype),
+        "X_val": torch.tensor(X_val, dtype=dtype),
+        "y_val": torch.tensor(y_val, dtype=dtype),
+        "X_test": torch.tensor(X_test, dtype=dtype),
+        "y_test": torch.tensor(y_test, dtype=dtype)
     }
 
     return result_dict
@@ -64,3 +65,4 @@ if __name__ == '__main__':
     batch_size = 16
     dataloader = DataLoader(result_data["X_train"], batch_size=batch_size, shuffle=True, drop_last=True)
     print(f"CIFAR loaded correctly, num of samples when batch_size={batch_size}: {len(dataloader) * 16}")
+    print(f"pixel range {result_data['X_train'].min()}-{result_data['X_train'].max()}")

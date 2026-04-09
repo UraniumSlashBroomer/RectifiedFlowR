@@ -102,6 +102,8 @@ class MultiHeadAttention(nn.Module):
         B, T, E = value.shape
         
         query = self.W_query(query)
+        value = self.W_value(value)
+        key = self.W_key(key)
 
         query = query.reshape(B, S, self.n_heads, self.head_dim).swapaxes(1, 2)
         value = value.reshape(B, T, self.n_heads, self.head_dim).swapaxes(1, 2)

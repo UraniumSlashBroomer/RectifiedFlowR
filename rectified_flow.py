@@ -2,15 +2,15 @@ from models import *
 import utils
 import torch
 import torch.nn as nn
+import math
 
 class TimeEmbedding(nn.Module):
     def __init__(self, emb_dim):
         super().__init__()
-        sincosemb = torch.zeros(size=(1, 1, emb_dim))
-        i = torch.arange(0, emb_dim, step=2)
-        sincosemb[:, :, i] = torch.sin(10000 ** (-i / emb_dim))
-        i += 1
-        sincosemb[:, :, i] = torch.cos(10000 ** (-i / emb_dim)) # [1, 1, E]
+        half_dim = emb_dim // 2
+        sincosemb = math.log(10000) / (half_dim - 1)
+        sincosemb = torch.exp(torch.arange(half_dim) * -sincosemb)
+        sincosemb = sincosemb.reshape(1, 1, half_dim)
         
         self.fc1 = nn.Linear(emb_dim, emb_dim)
         self.SiLU = nn.SiLU()
@@ -23,7 +23,8 @@ class TimeEmbedding(nn.Module):
         t: [B, 1]
         output: 
         """
-        t = t * self.sincosemb # [1, 1, E]
+        t = t * self.sincosemb # [1, 1, E // 2]
+        t = torch.cat((t.sin(), t.cos()), dim=-1)
         t = self.fc1(t)
         t = self.SiLU(t)
         t = self.fc2(t)
@@ -63,7 +64,7 @@ class AdaLN_EncoderLayer(nn.Module):
 
         shortcut = x
         x = self.norm_self(x)
-        x = (1 + shift_a) * x + scale_a
+        x = (1 + scale_a) * x + shift_a
         x = self.self_attn(x, x, x)
         x *= gate_a
         x = self.dropout_self(x)
@@ -71,7 +72,7 @@ class AdaLN_EncoderLayer(nn.Module):
 
         shortcut = x
         x = self.norm_ffn(x)
-        x = (1 + shift_ffn) * x + scale_ffn
+        x = (1 + scale_ffn) * x + shift_ffn
         x = self.ffn(x)
         x *= gate_ffn
         x = self.dropout_ffn(x)
