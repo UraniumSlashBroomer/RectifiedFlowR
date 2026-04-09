@@ -1,0 +1,28 @@
+from rectified_flow import *
+from data_utils import *
+from utils import *
+import torch
+import matplotlib.pyplot as plt
+
+if __name__ == '__main__':
+    model = RectifiedFlowViT(img_size=32,
+                             in_channels=3,
+                             patch_size=4,
+                             emb_dim=128,
+                             ffn_dim_ratio=4,
+                             n_heads=8,
+                             num_layers=4)
+    
+    data_dict = get_CIFAR10_data()
+    batch_size = 32
+    epochs = 2
+    optimizer = torch.optim.Adam(lr=3e-4, params=model.parameters(), weight_decay=1e-5)
+    loss_instance = torch.nn.MSELoss()
+    data_loader = torch.utils.data.DataLoader(data_dict["X_train"], batch_size=batch_size, shuffle=True, drop_last=True)
+
+    train_rectified_flow_model(model=model, optimizer=optimizer, epochs=epochs, criterion=loss_instance, data_loader=data_loader)
+
+    generated_img = model.sample(B=1, T=10).squeeze(0).permute(1, 2, 0).detach().clamp_(min=0, max=1).numpy()
+    plt.imsave('images/generated_image.png', generated_img)
+
+        
