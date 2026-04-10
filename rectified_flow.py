@@ -20,11 +20,11 @@ class TimeEmbedding(nn.Module):
 
     def forward(self, t):
         """
-        t: [B, 1]
-        output: 
+        t: [B, 1, 1]
+        output: [B, 1, E]
         """
-        t = t * self.sincosemb # [1, 1, E // 2]
-        t = torch.cat((t.sin(), t.cos()), dim=-1)
+        t = t * self.sincosemb # [B, 1, E // 2]
+        t = torch.cat((t.sin(), t.cos()), dim=-1) # [B, 1, E]
         t = self.fc1(t)
         t = self.SiLU(t)
         t = self.fc2(t)
@@ -126,6 +126,8 @@ class RectifiedFlowViT(nn.Module):
         self.in_channels = in_channels
         self.patch_size = patch_size
         
+        self.n_heads = n_heads
+    
         self.time_embedding = TimeEmbedding(emb_dim)
 
         if positional_encoding == 'sincos':

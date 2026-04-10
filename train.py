@@ -27,6 +27,9 @@ def parse_args():
     return parser.parse_args()
 
 def load_config(args):
+    if args.debug:
+        args.config = 'configs/debug_config.yaml'
+
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
     
@@ -95,10 +98,4 @@ if __name__ == '__main__':
     epochs = config['train']['process']['epochs']
     device = config['device']
 
-    train_rectified_flow_model(model=model, optimizer=optimizer, criterion=loss_instance, data_loader=data_loader, epochs=epochs, device=device)
-
-    generated_img = sample(model=model, B=1, T=10, device=device).cpu().squeeze(0).permute(1, 2, 0).detach().numpy()
-    generated_img = (generated_img + 1) / 2
-    generated_img = np.clip(generated_img, a_min=0, a_max=1)
-
-    plt.imsave('images/generated_image.png', generated_img)
+    train_rectified_flow_model(model=model, optimizer=optimizer, criterion=loss_instance, data_loader=data_loader, config=config)
