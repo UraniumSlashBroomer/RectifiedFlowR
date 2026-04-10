@@ -1,0 +1,26 @@
+model:
+  img_size: 32
+  in_channels: 3
+  patch_size: 8
+  emb_dim: 64
+  ffn_dim_ratio: 4
+  n_heads: 2
+  num_layers: 2
+  positional_encoding: 'sincos'
+  p_pos_encoding_dropout: 0.0
+  p_encoder_dropout: 0.0
+
+train:
+  data:
+    num_training: 10
+    num_validation: 10
+    batch_size: 2
+    drop_last: true
+  optimizer:
+    lr: 0.0003
+    weight_decay: 0.00001
+  process:
+    epochs: 2
+
+logger:
+  img_every_n_epochs: 0

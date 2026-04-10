@@ -19,7 +19,7 @@ def time_inference(model, batch_size, n_batches):
     diff = end - start
     print(f"tiem for {n_batches} batches with size {batch_size}: {diff // 60} min {diff % 60} sec")
 
-def train_rectified_flow_model(model, optimizer, epochs, criterion, data_loader, device="cpu"):
+def train_rectified_flow_model(model, optimizer, criterion, data_loader, epochs, device="cpu"):
     model = model.train()
 
     avg_loss = None
