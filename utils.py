@@ -37,7 +37,9 @@ def train_rectified_flow_model(model, optimizer, criterion, data_loader, config)
         noise_for_imgs = torch.randn(size=(config['checkpoint']['img_B'], model.in_channels, model.img_size, model.img_size))
 
     # savedir and save config
-    run_id = datetime.now().strftime("%Y-%m-%d/%H-%M-%S") + f"ViT-{model.n_heads}|{model.patch_size}_lr:{config['train']['optimizer']['lr']}_ep:{epochs}"   
+    run_id_part_1 = datetime.now().strftime("%Y-%m-%d")
+    run_id_part_2 = datetime.now().strftime("%H-%M-%S") + f"ViT-{model.n_heads}_{model.patch_size}_lr_{config['train']['optimizer']['lr']}_ep_{epochs}"
+    run_id = os.path.join(run_id_part_1, run_id_part_2)
     save_dir = os.path.join("results", run_id)
     os.makedirs(save_dir, exist_ok=True)
     if save_img_every_n_epochs:
@@ -99,7 +101,7 @@ def save_img(model, B, T, device, path, epoch, with_process=True):
 
     imgs = imgs.reshape(H * B, T * W, C)
     imgs = np.clip(imgs, a_min=-1, a_max=1)
-    imgs = 255 * (imgs + 1)
+    imgs = 255 * ((imgs + 1) / 2)
     imgs = imgs.astype(np.uint8)
 
     imgs = Image.fromarray(imgs)

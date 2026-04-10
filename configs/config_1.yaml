@@ -2,28 +2,28 @@ model:
   img_size: 32
   in_channels: 3
   patch_size: 4
-  emb_dim: 128
+  emb_dim: 384
   ffn_dim_ratio: 4
   n_heads: 8
-  num_layers: 4
+  num_layers: 8
   positional_encoding: 'sincos'
-  p_pos_encoding_dropout: 0.0
-  p_encoder_dropout: 0.0
+  p_pos_encoding_dropout: 0.2
+  p_encoder_dropout: 0.2
 
 train:
   data:
     num_training: 49000
     num_validation: 1000
-    batch_size: 128
+    batch_size: 196
     drop_last: true
   optimizer:
-    lr: 0.0003
-    weight_decay: 0.00001
+    lr: 0.0001
+    weight_decay: 0.001
   process:
     epochs: 250
 
 checkpoint:
   img_save_every_n_epochs: 10
   img_B: 10
-  img_T: 10
-  model_save_every_n_epochs: 5
+  img_T: 100
+  model_save_every_n_epochs: 2

@@ -24,6 +24,13 @@ def parse_args():
             default=False,
             help='turn on debug mode')
 
+    parser.add_argument(
+            '--epochs', type=int,
+            help='num of epochs')
+
+    parser.add_argument(
+            '--batch_size', type=int)
+
     return parser.parse_args()
 
 def load_config(args):
@@ -36,6 +43,12 @@ def load_config(args):
     config['device'] = args.device
     if config['device'] == 'cuda:0':
         assert config['device'] == 'cuda:0' and torch.cuda.is_available(), f"cuda is not available"
+
+    if args.epochs is not None:
+        config['train']['process']['epochs'] = args.epochs
+    
+    if args.batch_size is not None:
+        config['train']['data']['batch_size'] = args.batch_size
     
     return config
 
