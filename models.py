@@ -48,30 +48,18 @@ class PositionalEncodingSinCos(nn.Module):
 class PatchEmbedding(nn.Module):
     def __init__(self, patch_size, img_size, in_channels, emb_dim):
         super().__init__()
-        """
-        we assume that img is NxN, not HxW
-        """
 
-        assert img_size % patch_size == 0, "Image dimensions must be divisible by the patch size"
-
-        self.patch_size = patch_size
-        self.num_patches_in_line = img_size // self.patch_size
-        self.num_patches = self.num_patches_in_line ** 2
-        self.patch_dim = in_channels * patch_size ** 2 
-        
-        self.emb_proj = nn.Linear(self.patch_dim, emb_dim)
-
+        self.proj = nn.Conv2d(
+                in_channels,
+                emb_dim,
+                kernel_size=patch_size,
+                stride=patch_size
+        )
+    
     def forward(self, x):
-        # x: [B, C, N, N]
-        B, C, _, _ = x.shape
-        x = x.reshape(B, C, self.num_patches_in_line, self.patch_size, self.num_patches_in_line, self.patch_size)
-        x = x.swapaxes(3, 4) # [B, C, num_patches_in_line, num_patches_in_line, patch_size, patch_size]
-        x = x.reshape(B, C, self.num_patches, self.patch_size, self.patch_size)
-        x = x.swapaxes(1, 2) # [B, num_patches, C, patch_size, patch_size]
-        x = x.reshape(B, self.num_patches, C * self.patch_size ** 2)
-        
-        x = self.emb_proj(x) # [B, num_patches, E]
-
+        x = self.proj(x) # [B, E, num_patches_in_line, num_patches_in_line]
+        x = x.flatten(2) # [B, E, num_patches]
+        x = x.transpose(1, 2) # [B, S, E]
         return x
 
 class MultiHeadAttention(nn.Module):

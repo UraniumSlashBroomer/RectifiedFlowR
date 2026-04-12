@@ -2,7 +2,6 @@ from rectified_flow import *
 from data_utils import *
 from utils import *
 import torch
-import matplotlib.pyplot as plt
 import argparse
 import yaml
 
@@ -85,7 +84,7 @@ def init_data_loader(config):
 
     data_dict = get_CIFAR10_data(num_training, num_validation)
 
-    data_loader = torch.utils.data.DataLoader(data_dict['X_train'], batch_size=batch_size, drop_last=drop_last)
+    data_loader = torch.utils.data.DataLoader(data_dict['X_train'], batch_size=batch_size, drop_last=drop_last) # for overfit do this with X_train: expand(batch_size, -1, -1, -1)
 
     return data_loader
 
@@ -98,13 +97,12 @@ def init_optimizer(model, config):
     optimizer = torch.optim.Adam(lr=lr, params=model.parameters(), weight_decay=weight_decay)
     
     return optimizer
-
 if __name__ == '__main__':
     args = parse_args()
     config = load_config(args)
 
     model = init_model(config)
-    optimizer = init_optimizer(model, config)
+    optimizer = init_optimizer(model, config)   
     loss_instance = torch.nn.MSELoss()
     data_loader = init_data_loader(config)
     

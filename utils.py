@@ -1,4 +1,3 @@
-from time import time
 import torch
 from tqdm import tqdm
 from datetime import datetime
@@ -6,24 +5,8 @@ import os
 import yaml
 from PIL import Image
 import numpy as np
+import matplotlib.pyplot as plt
 
-
-def time_inference(model, batch_size, n_batches):
-    A = torch.randn(size=(batch_size, 3, model.img_size, model.img_size))
-
-    start = time()
-    _ = model(A)
-    end = time()
-    diff = end - start
-    print(f"time for 1 batch with size {batch_size}: {diff // 60} min {diff % 60} sec")
-
-    start = time()
-    for _ in range(n_batches):
-        output = model(A)
-    end = time()
-    
-    diff = end - start
-    print(f"tiem for {n_batches} batches with size {batch_size}: {diff // 60} min {diff % 60} sec")
 
 def train_rectified_flow_model(model, optimizer, criterion, data_loader, config):
     
@@ -93,20 +76,46 @@ def train_rectified_flow_model(model, optimizer, criterion, data_loader, config)
     return avg_loss
 
 @torch.no_grad()
-def save_img(model, B, T, device, path, epoch, with_process=True):
+def save_img(model, B, T, device, path, epoch, with_process=True, save_with_plt=True):
     result_path = os.path.join(path, f"{epoch}.png")
+    choosed_Ts = None
 
     imgs = sample(model, B, T, device, with_process)
     H, B, T, W, C = imgs.shape
+
+    if T >= 11:
+        choosed_Ts = np.linspace(0, T - 1, 10).round().astype('int')
+        imgs = imgs[:, :, choosed_Ts, :, :]
+        T = 10
 
     imgs = imgs.reshape(H * B, T * W, C)
     imgs = np.clip(imgs, a_min=-1, a_max=1)
     imgs = 255 * ((imgs + 1) / 2)
     imgs = imgs.astype(np.uint8)
+    
+    if save_with_plt:
+        if choosed_Ts is None:
+            choosed_Ts = range(0, T)
+        save_img_with_plt(imgs, choosed_Ts, epoch, result_path)
+        return
 
     imgs = Image.fromarray(imgs)
     imgs = imgs.resize((imgs.width * 4, imgs.height * 4), resample=Image.Resampling.NEAREST)
     imgs.save(result_path)
+
+def save_img_with_plt(grid, choosed_Ts, epoch, result_path):
+    fig, ax = plt.subplots(figsize=(15, 10))
+    ax.imshow(grid)
+    
+    one_frame_w = grid.shape[1] / len(choosed_Ts)
+    tick_positions = np.arange(len(choosed_Ts)) * one_frame_w + one_frame_w / 2
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels(f"T={i}" for i in choosed_Ts)
+    ax.set_yticks([])
+
+    plt.title(f"epoch {epoch}")
+    plt.savefig(result_path, bbox_inches='tight')
+    plt.close()
 
 @torch.no_grad()
 def sample(model, B, T, device, with_process=False):

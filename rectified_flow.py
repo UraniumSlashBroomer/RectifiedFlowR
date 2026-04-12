@@ -1,5 +1,4 @@
 from models import *
-import utils
 import torch
 import torch.nn as nn
 import math
@@ -23,7 +22,7 @@ class TimeEmbedding(nn.Module):
         t: [B, 1, 1]
         output: [B, 1, E]
         """
-        t = t * self.sincosemb # [B, 1, E // 2]
+        t = t * 1000 * self.sincosemb # [B, 1, E // 2]
         t = torch.cat((t.sin(), t.cos()), dim=-1) # [B, 1, E]
         t = self.fc1(t)
         t = self.SiLU(t)
@@ -52,7 +51,7 @@ class AdaLN_EncoderLayer(nn.Module):
                 nn.SiLU(),
                 nn.Linear(input_dim, 6 * input_dim),
                 )
-
+        
     def forward(self, x, t):
         """
         input: x [B, S, E]
@@ -110,8 +109,8 @@ class Unpatchify(nn.Module):
         B, num_patches, _ = x.shape
         x = self.fc(x) # [B, S, patch_size * patch_size * out_channels]
         num_patches_in_line = int(num_patches ** 0.5)
-        x = x.reshape(B, num_patches_in_line, self.patch_size, num_patches_in_line, self.patch_size, self.out_channels)
-        x = x.permute(0, -1, 1, 2, 3, 4)
+        x = x.reshape(B, num_patches_in_line, num_patches_in_line, self.patch_size, self.patch_size, self.out_channels)
+        x = x.permute(0, 5, 1, 3, 2, 4)
         x = x.reshape(B, self.out_channels, num_patches_in_line * self.patch_size, num_patches_in_line * self.patch_size)
         
         return x
@@ -162,6 +161,9 @@ class RectifiedFlowViT(nn.Module):
         elif isinstance(module, nn.LayerNorm):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
+        elif isinstance(module, AdaLN_EncoderLayer):
+            module.adaLN_modulation[-1].weight.data.zero_()
+            module.adaLN_modulation[-1].bias.data.zero_()
 
     def forward(self, x, t):
         """
