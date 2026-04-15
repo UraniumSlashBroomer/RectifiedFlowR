@@ -152,6 +152,8 @@ class RectifiedFlowViT(nn.Module):
         self.unpatchify = Unpatchify(emb_dim=emb_dim,
                                      patch_size=patch_size,
                                      out_channels=in_channels)
+
+        self.final_norm = nn.LayerNorm(emb_dim)
     
     def _init_weights(self, module):
         if isinstance(module, (nn.Linear, nn.Embedding)):
@@ -174,6 +176,7 @@ class RectifiedFlowViT(nn.Module):
         x = self.patch_embedding(x) # [B, S, E]
         x = self.positional_encoding(x) # [B, S, E]
         x = self.transformer(x, t) # [B, S, E]
+        x = self.final_norm(x)
         # x = x.mean(dim=1) # [B, E]
         imgs = self.unpatchify(x) # [B, C, N, N]
 

@@ -1,4 +1,4 @@
-dataset
+cifar-10-batches-py
 results
 __pycache__
 .venv

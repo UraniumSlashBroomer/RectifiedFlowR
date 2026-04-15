@@ -53,6 +53,7 @@ def save_img_with_plt(grid, choosed_Ts, epoch, result_path):
     plt.savefig(result_path, bbox_inches='tight')
     plt.close()
 
+
 @torch.no_grad()
 def sample(model, B, T, device, noise=None, with_process=False):
         """

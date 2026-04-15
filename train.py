@@ -124,16 +124,18 @@ def train_rectified_flow_model(model, optimizer, criterion, data_loader, config,
             total_loss += batch_loss.item() * B
 
         avg_loss = total_loss / total_num
-        checkpoint = {"model_state_dict": model.state_dict(),
-                      "optimizer_state_dict": optimizer.state_dict(),
-                      "noise_for_imgs": noise_for_imgs,
-                      "best_score": avg_loss,
-        }
 
-        if save_model_every_n_epochs and ((epoch + 1) == epochs or (epoch + 1) % save_model_every_n_epochs == 0):
-            torch.save(checkpoint, os.path.join(save_dir, "checkpoint_latest.pth"))
+        if (epoch + 1) == epochs or (save_model_every_n_epochs and (epoch + 1) % save_model_every_n_epochs == 0):
+            checkpoint = {"model_state_dict": model.state_dict(),
+                          "optimizer_state_dict": optimizer.state_dict(),
+                          "noise_for_imgs": noise_for_imgs,
+                          "epoch": epoch,
+                          "best_loss": avg_loss,
+            }
 
-        if save_img_every_n_epochs and ((epoch + 1) == epochs or (epoch + 1) % save_img_every_n_epochs == 0):
+            torch.save(checkpoint, os.path.join(save_dir, "checkpoint.pth"))
+
+        if (epoch + 1) == epochs or (save_img_every_n_epochs and (epoch + 1) % save_img_every_n_epochs == 0):
             save_img(model=model,
                      B=config['checkpoint']['img_B'],
                      T=config['checkpoint']['img_T'], 
