@@ -4,6 +4,7 @@ import os
 import torch
 from torch.utils.data import DataLoader
 
+
 def load_CIFAR_batch(filename):
     with open(filename, 'rb') as f:
         datadict = pickle.load(f, encoding='latin1')
@@ -12,6 +13,7 @@ def load_CIFAR_batch(filename):
         X = X.reshape(10000, 3, 32, 32).astype("float")
         Y = np.array(Y)
         return X, Y
+
 
 def load_CIFAR10(root):
     xs = []
@@ -27,9 +29,10 @@ def load_CIFAR10(root):
     Xte, Yte = load_CIFAR_batch(os.path.join(root, "test_batch"))
     return Xtr, Ytr, Xte, Yte
 
+
 def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=1000, dtype=torch.float32):
     cifar10_dir = os.path.join(
-            os.path.dirname(__file__), "dataset/cifar-10-batches-py"
+            os.path.dirname(__file__), "../dataset/cifar-10-batches-py"
     )
     X_train, y_train, X_test, y_test = load_CIFAR10(cifar10_dir)
 
@@ -59,6 +62,7 @@ def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=1000, dty
     }
 
     return result_dict
+
 
 if __name__ == '__main__':
     result_data = get_CIFAR10_data()

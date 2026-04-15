@@ -27,3 +27,4 @@ checkpoint:
   img_B: 10
   img_T: 100
   model_save_every_n_epochs: 2
+  saveroot: results/

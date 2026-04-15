@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch
 import math
 import copy
-import utils
+
 
 class PositionalEncodingEmb(nn.Module):
     def __init__(self, n_patches, emb_dim, p_dropout=0.0):
@@ -20,6 +20,7 @@ class PositionalEncodingEmb(nn.Module):
         x = self.dropout(x + self.positional_emb)
 
         return x
+
 
 class PositionalEncodingSinCos(nn.Module):
     def __init__(self, emb_dim, p_dropout=0.0, max_length=5000):
@@ -45,9 +46,12 @@ class PositionalEncodingSinCos(nn.Module):
         
         return x
 
+
 class PatchEmbedding(nn.Module):
     def __init__(self, patch_size, img_size, in_channels, emb_dim):
         super().__init__()
+        
+        assert img_size % patch_size == 0, f"img_size should be divisable by patch_size"
 
         self.proj = nn.Conv2d(
                 in_channels,
@@ -61,6 +65,7 @@ class PatchEmbedding(nn.Module):
         x = x.flatten(2) # [B, E, num_patches]
         x = x.transpose(1, 2) # [B, S, E]
         return x
+
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, emb_dim, n_heads, p_dropout=0.0):
@@ -108,6 +113,7 @@ class MultiHeadAttention(nn.Module):
         
         return output
 
+
 class FeedForwardNetwork(nn.Module):
     def __init__(self, emb_dim, ffn_dim, p_dropout=0.0):
         super().__init__()
@@ -124,6 +130,7 @@ class FeedForwardNetwork(nn.Module):
         x = self.fc2(x)
 
         return x
+
 
 class TransformerEncoderLayer(nn.Module):
     def __init__(self, input_dim, n_heads, ffn_dim_ratio, p_dropout=0.0):
@@ -154,6 +161,7 @@ class TransformerEncoderLayer(nn.Module):
 
         return x
 
+
 class TransformerEncoder(nn.Module):
     def __init__(self, encoder_layer, num_layers):
         super().__init__()
@@ -169,6 +177,7 @@ class TransformerEncoder(nn.Module):
             x = mod(x)
 
         return x 
+
 
 class ViT(nn.Module):
     def __init__(self, img_size, in_channels, patch_size, emb_dim, ffn_dim_ratio,
@@ -223,8 +232,10 @@ class ViT(nn.Module):
 
         return logits 
 
+
 def clones(module, num_layers):
     return nn.ModuleList([copy.deepcopy(module) for _ in range(num_layers)])
+
 
 if __name__ == '__main__':
     model = ViT(img_size=32, in_channels=3,
@@ -239,5 +250,4 @@ if __name__ == '__main__':
     img = img.unsqueeze(0)
     result = model(img)
     print(result)
-    utils.time_inference(model, 8, 4)
     print(f"number of parameters: {sum([p.numel() for p in model.parameters()])}\nnumber of learnable parameters: {sum([p.numel() for p in model.parameters()])}")   

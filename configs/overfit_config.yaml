@@ -13,7 +13,7 @@ model:
 train:
   data:
     num_training: 1
-    num_validation: 1
+    num_validation: 10
     batch_size: 32
     drop_last: true
   optimizer:
@@ -24,6 +24,7 @@ train:
 
 checkpoint:
   img_save_every_n_epochs: 100
-  img_B: 1
+  img_B: 2
   img_T: 100
   model_save_every_n_epochs: 0
+  saveroot: results/
