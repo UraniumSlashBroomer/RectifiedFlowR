@@ -78,7 +78,7 @@ def train_rectified_flow_model(model, optimizer, criterion, data_loader, config,
     save_img_every_n_epochs = config['checkpoint']['img_save_every_n_epochs']
     noise_for_imgs = None
     if save_img_every_n_epochs:
-        noise_for_imgs = torch.randn(size=(config['checkpoint']['img_B'], model.in_channels, model.img_size, model.img_size))
+        noise_for_imgs = torch.randn(size=(config['checkpoint']['img_B'], model.in_channels, model.img_size, model.img_size)).to(device)
 
     # savedir and save config
     if not(debug):
