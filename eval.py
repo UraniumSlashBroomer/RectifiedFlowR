@@ -29,11 +29,13 @@ def find_experiments(root_dir='results'):
     experiments.sort(key=lambda x: (x[1], x[0]), reverse=True)
     return experiments
 
+
 def load_experiment(experiment_path):
     config_path = experiment_path / 'resolved_config.yaml'
     checkpoint_path = experiment_path / 'checkpoint.pth'
 
-    model, _, _, _, _, config = load_checkpoint(config_path, checkpoint_path)
+    _, ema_model, _, _, _, _, config = load_checkpoint(config_path, checkpoint_path)
+    model = ema_model.ema_model
     return model, config
     
 

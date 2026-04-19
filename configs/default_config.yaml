@@ -10,6 +10,9 @@ model:
   p_pos_encoding_dropout: 0.0
   p_encoder_dropout: 0.0
 
+  ema_model:
+    decay: 0.999
+
 train:
   data:
     num_training: 49000

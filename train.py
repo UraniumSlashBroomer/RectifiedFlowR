@@ -1,6 +1,7 @@
 from src.modules.rectified_flow import *
 from src.utils.data_utils import *
 from src.utils.utils import *
+from src.utils.initialization import *
 import torch
 import argparse
 import yaml
@@ -45,38 +46,14 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_config(args):
-    if args.mode == 'debug':
-        args.config = 'configs/debug_config.yaml'
-    elif args.mode == 'overfit':
-        args.config = 'configs/overfit_config.yaml'
-
-    with open(args.config, 'r') as f:
-        config = yaml.safe_load(f)
-    
-    config['device'] = args.device
-    if config['device'] == 'cuda:0':
-        assert config['device'] == 'cuda:0' and torch.cuda.is_available(), f"cuda is not available"
-
-    if args.epochs is not None:
-        config['train']['process']['epochs'] = args.epochs
-    
-    if args.batch_size is not None:
-        config['train']['data']['batch_size'] = args.batch_size
-
-    if args.num_training is not None:
-        config['train']['data']['num_training'] = args.num_training
-    
-    return config
-
-
-def train_rectified_flow_model(model, optimizer, criterion, data_loader, config, debug=False):
+def train_rectified_flow_model(model, ema_model, optimizer, criterion, data_loader, config, debug=False):
     epochs = config['train']['process']['epochs']
     device = config['device']
     save_model_every_n_epochs = config['checkpoint']['model_save_every_n_epochs']
 
     save_img_every_n_epochs = config['checkpoint']['img_save_every_n_epochs']
     noise_for_imgs = None
+    save_img_path = None
     if save_img_every_n_epochs:
         noise_for_imgs = torch.randn(size=(config['checkpoint']['img_B'], model.in_channels, model.img_size, model.img_size)).to(device)
 
@@ -120,6 +97,8 @@ def train_rectified_flow_model(model, optimizer, criterion, data_loader, config,
             batch_loss.backward()
             optimizer.step()
             
+            ema_model.update(model)
+
             total_num += B
             total_loss += batch_loss.item() * B
 
@@ -127,6 +106,7 @@ def train_rectified_flow_model(model, optimizer, criterion, data_loader, config,
 
         if (epoch + 1) == epochs or (save_model_every_n_epochs and (epoch + 1) % save_model_every_n_epochs == 0):
             checkpoint = {"model_state_dict": model.state_dict(),
+                          "ema_model_state_dict": ema_model.state_dict(),
                           "optimizer_state_dict": optimizer.state_dict(),
                           "noise_for_imgs": noise_for_imgs,
                           "epoch": epoch,
@@ -136,7 +116,7 @@ def train_rectified_flow_model(model, optimizer, criterion, data_loader, config,
             torch.save(checkpoint, os.path.join(save_dir, "checkpoint.pth"))
 
         if (epoch + 1) == epochs or (save_img_every_n_epochs and (epoch + 1) % save_img_every_n_epochs == 0):
-            save_img(model=model,
+            save_img(model=ema_model,
                      B=config['checkpoint']['img_B'],
                      T=config['checkpoint']['img_T'], 
                      path=save_img_path,
@@ -149,64 +129,12 @@ def train_rectified_flow_model(model, optimizer, criterion, data_loader, config,
     return avg_loss
 
 
-def init_model(config):
-    model_config = config['model']
-    device = config['device']
-
-    img_size = model_config['img_size']
-    in_channels = model_config['in_channels']
-    patch_size = model_config['patch_size']
-    emb_dim = model_config['emb_dim']
-    ffn_dim_ratio = model_config['ffn_dim_ratio']
-    n_heads = model_config['n_heads']
-    num_layers = model_config['num_layers']
-
-    model = RectifiedFlowViT(img_size=img_size,
-                             in_channels=in_channels,
-                             patch_size=patch_size,
-                             emb_dim=emb_dim,
-                             ffn_dim_ratio=ffn_dim_ratio,
-                             n_heads=n_heads,
-                             num_layers=num_layers).to(device)
-
-    return model
-
-
-def init_data_loader(config):
-    data_config = config['train']['data']
-
-    num_training = data_config['num_training']
-    num_validation = data_config['num_validation']
-
-    batch_size = data_config['batch_size']
-    drop_last = data_config['drop_last']
-
-    data_dict = get_CIFAR10_data(num_training, num_validation)
-    
-    if num_training < batch_size:
-        data_loader = torch.utils.data.DataLoader(data_dict['X_train'].repeat(batch_size // num_training, 1, 1, 1), batch_size=batch_size)
-    else:
-        data_loader = torch.utils.data.DataLoader(data_dict['X_train'], batch_size=batch_size, drop_last=drop_last)
-
-    return data_loader
-
-
-def init_optimizer(model, config):
-    optimizer_config = config['train']['optimizer']
-    
-    lr = optimizer_config['lr']
-    weight_decay = optimizer_config['weight_decay']
-    
-    optimizer = torch.optim.Adam(lr=lr, params=model.parameters(), weight_decay=weight_decay)
-    
-    return optimizer
-
-
 if __name__ == '__main__':
     args = parse_args()
     config = load_config(args)
 
     model = init_model(config)
+    ema_model = init_ema(model, config)
     optimizer = init_optimizer(model, config)   
     loss_instance = torch.nn.MSELoss()
     data_loader = init_data_loader(config)
@@ -216,4 +144,4 @@ if __name__ == '__main__':
 
     debug_mode = args.mode == 'debug'
 
-    train_rectified_flow_model(model=model, optimizer=optimizer, criterion=loss_instance, data_loader=data_loader, config=config, debug=debug_mode)
+    train_rectified_flow_model(model=model, ema_model=ema_model, optimizer=optimizer, criterion=loss_instance, data_loader=data_loader, config=config, debug=debug_mode)

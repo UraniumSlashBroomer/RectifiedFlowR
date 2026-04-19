@@ -2,6 +2,7 @@ from .modules import *
 import torch
 import torch.nn as nn
 import math
+import copy
 
 class TimeEmbedding(nn.Module):
     def __init__(self, emb_dim):
@@ -154,7 +155,7 @@ class RectifiedFlowViT(nn.Module):
                                      out_channels=in_channels)
 
         self.final_norm = nn.LayerNorm(emb_dim)
-    
+     
     def _init_weights(self, module):
         if isinstance(module, (nn.Linear, nn.Embedding)):
             module.weight.data.normal_(mean=0.0, std=0.02)
@@ -166,7 +167,7 @@ class RectifiedFlowViT(nn.Module):
         elif isinstance(module, AdaLN_EncoderLayer):
             module.adaLN_modulation[-1].weight.data.zero_()
             module.adaLN_modulation[-1].bias.data.zero_()
-
+    
     def forward(self, x, t):
         """
         input: images [B, C, N, N],
@@ -181,3 +182,29 @@ class RectifiedFlowViT(nn.Module):
         imgs = self.unpatchify(x) # [B, C, N, N]
 
         return imgs
+
+
+class EMAModel:
+    def __init__(self, model, decay=0.999):
+        super().__init__()
+        self.decay = decay
+        self.ema_model = copy.deepcopy(model)
+        self.ema_model.eval()
+
+        for param in self.ema_model.parameters():
+            param.required_grad_(False)
+
+    @torch.no_grad()
+    def update(self, model):
+        for ema_param, model_param in zip(self.ema_model.parameters(), model.parameters()):
+            ema_param.data.lerp_(model_param.data, 1.0 - self.decay)
+    
+    def forward(self, x, t):
+        x = self.ema_model(x, t)
+        return x
+
+    def state_dict(self):
+        return self.ema_model.state_dict()
+
+    def load_state_dict(self, state_dict):
+        self.ema_model.load_state_dict(state_dict)

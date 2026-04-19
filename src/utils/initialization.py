@@ -1,6 +1,6 @@
 import torch
 from .data_utils import get_CIFAR10_data
-from ..modules.rectified_flow import RectifiedFlowViT
+from ..modules.rectified_flow import RectifiedFlowViT, EMAModel
 import yaml
 
 
@@ -25,6 +25,16 @@ def init_model(config):
                              num_layers=num_layers).to(device)
 
     return model
+
+
+def init_ema(model, config):
+    try:
+        decay = config['model']['ema_model']['decay']
+    except KeyError:
+        decay = 0.999
+
+    ema_model = EMAModel(model, decay=decay)
+    return ema_model
 
 
 def init_data_loader(config):
@@ -62,15 +72,42 @@ def load_checkpoint(config_path, checkpoint_path):
         config = yaml.safe_load(f)
 
     model = init_model(config)
+    ema_model = init_ema(model, config)
     data_loader = init_data_loader(config)
     optimizer = init_optimizer(model, config)
         
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
 
     model.load_state_dict(checkpoint['model_state_dict'])
+    ema_model.load_state_dict(checkpoint['ema_model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     
     epoch = checkpoint['epoch']
     best_loss = checkpoint['best_loss']
 
-    return model, data_loader, optimizer, epoch, best_loss, config
+    return model, ema_model, data_loader, optimizer, epoch, best_loss, config
+
+
+def load_config(args):
+    if args.mode == 'debug':
+        args.config = 'configs/debug_config.yaml'
+    elif args.mode == 'overfit':
+        args.config = 'configs/overfit_config.yaml'
+
+    with open(args.config, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    config['device'] = args.device
+    if config['device'] == 'cuda:0':
+        assert config['device'] == 'cuda:0' and torch.cuda.is_available(), f"cuda is not available"
+
+    if args.epochs is not None:
+        config['train']['process']['epochs'] = args.epochs
+    
+    if args.batch_size is not None:
+        config['train']['data']['batch_size'] = args.batch_size
+
+    if args.num_training is not None:
+        config['train']['data']['num_training'] = args.num_training
+    
+    return config
