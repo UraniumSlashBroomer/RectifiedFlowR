@@ -1,6 +1,7 @@
 import torch
 from .data_utils import get_CIFAR10_data
 from ..modules.rectified_flow import RectifiedFlowViT, EMAModel
+from .utils import get_config_checkpoint_path
 import yaml
 
 
@@ -67,7 +68,30 @@ def init_optimizer(model, config):
     return optimizer
 
 
-def load_checkpoint(config_path, checkpoint_path):
+def init_scheduler(optimizer, config):
+    try:
+        type = config['train']['scheduler']['type']
+    except KeyError:
+        type = None
+    
+    scheduler = None
+    data_config = config['train']['data']
+    total_batches = data_config['num_training'] // data_config['batch_size'] * config['train']['process']['epochs']
+
+    if type == 'CosineAnnealingLR':
+        eta_min = config['train']['scheduler']['eta_min']
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer,
+                                                               T_max=total_batches,
+                                                               eta_min=eta_min)
+    else:
+        print(f"no scheduler in config")
+    
+    return scheduler
+    
+
+def load_checkpoint(experiment_path):
+    config_path, checkpoint_path = get_config_checkpoint_path(experiment_path)
+
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
 
@@ -75,17 +99,22 @@ def load_checkpoint(config_path, checkpoint_path):
     ema_model = init_ema(model, config)
     data_loader = init_data_loader(config)
     optimizer = init_optimizer(model, config)
-        
+    scheduler = init_scheduler(optimizer, config)
+
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
 
     model.load_state_dict(checkpoint['model_state_dict'])
     ema_model.load_state_dict(checkpoint['ema_model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     
-    epoch = checkpoint['epoch']
-    best_loss = checkpoint['best_loss']
+    if scheduler is not None:
+        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
-    return model, ema_model, data_loader, optimizer, epoch, best_loss, config
+    epoch = checkpoint['epoch']
+    avg_loss = checkpoint['avg_loss']
+    noise_for_imgs = checkpoint['noise_for_imgs']
+
+    return model, ema_model, data_loader, optimizer, scheduler, epoch, avg_loss, noise_for_imgs, config
 
 
 def load_config(args):

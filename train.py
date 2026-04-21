@@ -24,7 +24,7 @@ def parse_args():
     
     parser.add_argument(
             '--mode',
-            choices=['train', 'debug', 'overfit'],
+            choices=['train', 'debug', 'overfit', 'train_c'],
             default='train',
             help='mode of running train script, default: train')
 
@@ -46,21 +46,16 @@ def parse_args():
     return parser.parse_args()
 
 
-def train_rectified_flow_model(model, ema_model, optimizer, criterion, data_loader, config, debug=False):
+def prepare_saving(model, config, start_epoch, debug=False):
     epochs = config['train']['process']['epochs']
-    device = config['device']
     save_model_every_n_epochs = config['checkpoint']['model_save_every_n_epochs']
-
     save_img_every_n_epochs = config['checkpoint']['img_save_every_n_epochs']
-    noise_for_imgs = None
     save_img_path = None
-    if save_img_every_n_epochs:
-        noise_for_imgs = torch.randn(size=(config['checkpoint']['img_B'], model.in_channels, model.img_size, model.img_size)).to(device)
 
     # savedir and save config
     if not(debug):
         run_id_part_1 = datetime.now().strftime("%Y-%m-%d")
-        run_id_part_2 = datetime.now().strftime("%H-%M-%S") + f"ViT-{model.n_heads}_{model.patch_size}_ep_{epochs}"
+        run_id_part_2 = datetime.now().strftime("%H-%M-%S") + f"ViT-{model.n_heads}_{model.patch_size}_ep_{start_epoch}_{epochs}"
         run_id = os.path.join(run_id_part_1, run_id_part_2)
         save_dir = os.path.join(config['checkpoint']['saveroot'], run_id)
         os.makedirs(save_dir, exist_ok=True)
@@ -78,10 +73,37 @@ def train_rectified_flow_model(model, ema_model, optimizer, criterion, data_load
     with open(os.path.join(save_dir, "resolved_config.yaml"), "w") as f:
         yaml.dump(config, f, default_flow_style=False)
 
+    return save_model_every_n_epochs, save_img_every_n_epochs, save_img_path, save_dir
+
+
+def save_checkpoint(epoch, epochs, save_model_every_n_epochs, model, ema_model, optimizer, scheduler, noise_for_imgs, avg_loss, save_dir):
+    if (epoch + 1) == epochs or (save_model_every_n_epochs and (epoch + 1) % save_model_every_n_epochs == 0):
+        checkpoint = {"model_state_dict": model.state_dict(),
+                      "ema_model_state_dict": ema_model.state_dict(),
+                      "optimizer_state_dict": optimizer.state_dict(),
+                      "scheduler_state_dict": scheduler.state_dict() if scheduler is not None else None,
+                      "noise_for_imgs": noise_for_imgs,
+                      "epoch": epoch,
+                      "avg_loss": avg_loss,
+        }
+
+        torch.save(checkpoint, os.path.join(save_dir, "checkpoint.pth"))
+
+
+def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion, data_loader, config, start_epoch=0, noise_for_imgs=None, debug=False):
+    epochs = config['train']['process']['epochs']
+    device = config['device']
+    save_model_every_n_epochs, save_img_every_n_epochs, save_img_path, save_dir = prepare_saving(model, config, start_epoch, debug)
+    
+    if noise_for_imgs is None:
+        noise_for_imgs = torch.randn(size=(config['checkpoint']['img_B'], model.in_channels, model.img_size, model.img_size)).to(device)
+    else:
+        noise_for_imgs.to(device)
+
     model = model.train()
     avg_loss = None
 
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, epochs):
         total_loss, total_num = 0.0, 0.0
         for x in tqdm(data_loader):
             B, C, N, N = x.shape
@@ -97,26 +119,18 @@ def train_rectified_flow_model(model, ema_model, optimizer, criterion, data_load
             batch_loss.backward()
             optimizer.step()
             
-            ema_model.update(model)
+            if scheduler is not None:
+                scheduler.step()
 
+            ema_model.update(model)
             total_num += B
             total_loss += batch_loss.item() * B
 
         avg_loss = total_loss / total_num
-
-        if (epoch + 1) == epochs or (save_model_every_n_epochs and (epoch + 1) % save_model_every_n_epochs == 0):
-            checkpoint = {"model_state_dict": model.state_dict(),
-                          "ema_model_state_dict": ema_model.state_dict(),
-                          "optimizer_state_dict": optimizer.state_dict(),
-                          "noise_for_imgs": noise_for_imgs,
-                          "epoch": epoch,
-                          "best_loss": avg_loss,
-            }
-
-            torch.save(checkpoint, os.path.join(save_dir, "checkpoint.pth"))
+        save_checkpoint(epoch, epochs, save_model_every_n_epochs, model, ema_model, optimizer, scheduler, noise_for_imgs, avg_loss, save_dir)
 
         if (epoch + 1) == epochs or (save_img_every_n_epochs and (epoch + 1) % save_img_every_n_epochs == 0):
-            save_img(model=ema_model,
+            save_img(model=ema_model.ema_model,
                      B=config['checkpoint']['img_B'],
                      T=config['checkpoint']['img_T'], 
                      path=save_img_path,
@@ -132,16 +146,28 @@ def train_rectified_flow_model(model, ema_model, optimizer, criterion, data_load
 if __name__ == '__main__':
     args = parse_args()
     config = load_config(args)
-
-    model = init_model(config)
-    ema_model = init_ema(model, config)
-    optimizer = init_optimizer(model, config)   
-    loss_instance = torch.nn.MSELoss()
-    data_loader = init_data_loader(config)
     
-    epochs = config['train']['process']['epochs']
-    device = config['device']
+    if args.mode == 'train_c':
+        exp_path = choose_experiment()
+        model, ema_model, data_loader, optimizer, scheduler, epoch, best_loss, noise_for_imgs, config = load_checkpoint(exp_path)
+    else:
+        model = init_model(config)
+        ema_model = init_ema(model, config)
+        optimizer = init_optimizer(model, config)
+        scheduler = init_scheduler(optimizer, config)
+        data_loader = init_data_loader(config)
+        epoch = 0
+        noise_for_imgs = None
+        avg_loss = None
 
+    loss_instance = torch.nn.MSELoss()
     debug_mode = args.mode == 'debug'
 
-    train_rectified_flow_model(model=model, ema_model=ema_model, optimizer=optimizer, criterion=loss_instance, data_loader=data_loader, config=config, debug=debug_mode)
+    train_rectified_flow_model(model=model, ema_model=ema_model,
+                               optimizer=optimizer, scheduler=scheduler,
+                               criterion=loss_instance,
+                               data_loader=data_loader,
+                               config=config,
+                               start_epoch=epoch,
+                               noise_for_imgs=noise_for_imgs,
+                               debug=debug_mode)

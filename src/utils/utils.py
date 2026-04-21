@@ -3,7 +3,7 @@ import os
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
-
+import pathlib
 
 @torch.no_grad()
 def save_img(model, B, T, device, path, epoch, noise_for_img, with_process=True, save_with_plt=True):
@@ -85,3 +85,32 @@ def sample(model, B, T, device, noise=None, with_process=False):
         if not(with_process):
             return sample.permute(0, 2, 3, 1).cpu().detach().numpy()
         return output.permute(1, 3, 0, 4, 2).cpu().detach().numpy() # [T, B, C, H, W] -> [B, H, T, W, C]
+
+
+def find_experiments(root_dir='results'):
+    root = pathlib.Path(root_dir)
+    experiments = []
+
+    for checkpoint_path in root.rglob("checkpoint.pth"):
+        experiment_path = checkpoint_path.parent
+        experiments.append((experiment_path, experiment_path.parent))
+
+    experiments.sort(key=lambda x: (x[1], x[0]), reverse=True)
+    return experiments
+
+
+def get_config_checkpoint_path(experiment_path):
+    config_path = experiment_path / 'resolved_config.yaml'
+    checkpoint_path = experiment_path / 'checkpoint.pth'
+    return config_path, checkpoint_path
+
+def choose_experiment():
+    experiments = find_experiments('./results')
+    
+    print(f"choose which exp load:")
+    for ind, experiment in enumerate(experiments):
+        print(f"{ind + 1}. {experiment}")
+    
+    choosed_ind = int(input()) - 1
+    exp_path = experiments[choosed_ind][0]
+    return exp_path

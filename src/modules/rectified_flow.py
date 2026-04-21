@@ -192,7 +192,7 @@ class EMAModel:
         self.ema_model.eval()
 
         for param in self.ema_model.parameters():
-            param.required_grad_(False)
+            param.requires_grad_(False)
 
     @torch.no_grad()
     def update(self, model):
@@ -208,3 +208,12 @@ class EMAModel:
 
     def load_state_dict(self, state_dict):
         self.ema_model.load_state_dict(state_dict)
+        return self
+    
+    def to(self, device):
+        self.ema_model.to(device)
+        return self
+
+    def eval(self):
+        self.ema_model.eval()
+        return self

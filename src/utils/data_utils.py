@@ -62,11 +62,3 @@ def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=1000, dty
     }
 
     return result_dict
-
-
-if __name__ == '__main__':
-    result_data = get_CIFAR10_data()
-    batch_size = 16
-    dataloader = DataLoader(result_data["X_train"], batch_size=batch_size, shuffle=True, drop_last=True)
-    print(f"CIFAR loaded correctly, num of samples when batch_size={batch_size}: {len(dataloader) * 16}")
-    print(f"pixel range {result_data['X_train'].min()}-{result_data['X_train'].max()}")

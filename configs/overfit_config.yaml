@@ -10,6 +10,9 @@ model:
   p_pos_encoding_dropout: 0.0
   p_encoder_dropout: 0.0
 
+  ema_model:
+    decay: 0.8
+
 train:
   data:
     num_training: 1
@@ -26,5 +29,5 @@ checkpoint:
   img_save_every_n_epochs: 100
   img_B: 2
   img_T: 100
-  model_save_every_n_epochs: 0
+  model_save_every_n_epochs: 100
   saveroot: results/

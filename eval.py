@@ -1,6 +1,5 @@
 from src.utils.initialization import load_checkpoint
-from src.utils.utils import sample
-import pathlib
+from src.utils.utils import sample, choose_experiment
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,40 +16,17 @@ def parse_args():
     return parser.parse_args()
 
 
-def find_experiments(root_dir='results'):
-    root = pathlib.Path(root_dir)
-    experiments = []
-
-    for checkpoint_path in root.rglob("checkpoint.pth"):
-        experiment_path = checkpoint_path.parent
-        #if experiment_path.name != 'debug':
-        experiments.append((experiment_path, experiment_path.parent))
-
-    experiments.sort(key=lambda x: (x[1], x[0]), reverse=True)
-    return experiments
-
-
 def load_experiment(experiment_path):
-    config_path = experiment_path / 'resolved_config.yaml'
-    checkpoint_path = experiment_path / 'checkpoint.pth'
-
-    _, ema_model, _, _, _, _, config = load_checkpoint(config_path, checkpoint_path)
+    _, ema_model, _, _, _, _, _, _, config = load_checkpoint(experiment_path)
     model = ema_model.ema_model
     return model, config
-    
+ 
 
 if __name__ == '__main__':
     args = parse_args()
     device = args.device
-
-    experiments = find_experiments('./results')
     
-    print(f"choose which exp load:")
-    for ind, experiment in enumerate(experiments):
-        print(f"{ind + 1}. {experiment}")
-    
-    choosed_ind = int(input()) - 1
-    exp_path = experiments[choosed_ind][0]
+    exp_path = choose_experiment()
     model, config = load_experiment(exp_path)
     
     H = W = model.img_size
