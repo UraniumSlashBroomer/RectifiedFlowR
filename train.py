@@ -29,11 +29,6 @@ def parse_args():
             help='mode of running train script, default: train')
 
     parser.add_argument(
-            '--debug', type=bool,
-            default=False,
-            help='turn on debug mode')
-
-    parser.add_argument(
             '--epochs', type=int,
             help='num of epochs')
 
@@ -117,6 +112,7 @@ def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion
             optimizer.zero_grad()         
             batch_loss = criterion(pred, target)
             batch_loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             
             if scheduler is not None:

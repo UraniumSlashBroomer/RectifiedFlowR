@@ -4,6 +4,7 @@ import torch.nn as nn
 import math
 import copy
 
+
 class TimeEmbedding(nn.Module):
     def __init__(self, emb_dim):
         super().__init__()
@@ -30,6 +31,7 @@ class TimeEmbedding(nn.Module):
         t = self.fc2(t)
 
         return t
+
 
 class AdaLN_EncoderLayer(nn.Module):
     def __init__(self, input_dim, n_heads, ffn_dim_ratio, p_dropout=0.0):
@@ -80,6 +82,7 @@ class AdaLN_EncoderLayer(nn.Module):
 
         return x
 
+
 class RectifiedFlowTransformerEncoder(nn.Module):
     def __init__(self, encoder_layer, num_layers):
         super().__init__()
@@ -95,6 +98,7 @@ class RectifiedFlowTransformerEncoder(nn.Module):
             x = mod(x, t)
 
         return x 
+
 
 class Unpatchify(nn.Module):
     def __init__(self, emb_dim, patch_size, out_channels):
@@ -115,6 +119,7 @@ class Unpatchify(nn.Module):
         x = x.reshape(B, self.out_channels, num_patches_in_line * self.patch_size, num_patches_in_line * self.patch_size)
         
         return x
+
 
 class RectifiedFlowViT(nn.Module):
     def __init__(self, img_size, in_channels, patch_size, emb_dim, ffn_dim_ratio,
@@ -155,7 +160,7 @@ class RectifiedFlowViT(nn.Module):
                                      out_channels=in_channels)
 
         self.final_norm = nn.LayerNorm(emb_dim)
-     
+    
     def _init_weights(self, module):
         if isinstance(module, (nn.Linear, nn.Embedding)):
             module.weight.data.normal_(mean=0.0, std=0.02)
