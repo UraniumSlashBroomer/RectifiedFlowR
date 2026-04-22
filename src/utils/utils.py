@@ -100,9 +100,13 @@ def find_experiments(root_dir='results'):
 
 
 def get_config_checkpoint_path(experiment_path):
+    if type(experiment_path) == str:
+        experiment_path = pathlib.Path(experiment_path)
+
     config_path = experiment_path / 'resolved_config.yaml'
     checkpoint_path = experiment_path / 'checkpoint.pth'
     return config_path, checkpoint_path
+
 
 def choose_experiment():
     experiments = find_experiments('./results')

@@ -38,6 +38,9 @@ def parse_args():
     parser.add_argument(
             '--num_training', type=int)
 
+    parser.add_argument(
+            '--experiment', type=str)
+
     return parser.parse_args()
 
 
@@ -72,7 +75,7 @@ def prepare_saving(model, config, start_epoch, debug=False):
 
 
 def save_checkpoint(epoch, epochs, save_model_every_n_epochs, model, ema_model, optimizer, scheduler, noise_for_imgs, avg_loss, save_dir):
-    if (epoch + 1) == epochs or (save_model_every_n_epochs and (epoch + 1) % save_model_every_n_epochs == 0):
+    if epoch == epochs or (save_model_every_n_epochs and epoch % save_model_every_n_epochs == 0):
         checkpoint = {"model_state_dict": model.state_dict(),
                       "ema_model_state_dict": ema_model.state_dict(),
                       "optimizer_state_dict": optimizer.state_dict(),
@@ -123,7 +126,7 @@ def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion
             total_loss += batch_loss.item() * B
 
         avg_loss = total_loss / total_num
-        save_checkpoint(epoch, epochs, save_model_every_n_epochs, model, ema_model, optimizer, scheduler, noise_for_imgs, avg_loss, save_dir)
+        save_checkpoint(epoch + 1, epochs, save_model_every_n_epochs, model, ema_model, optimizer, scheduler, noise_for_imgs, avg_loss, save_dir)
 
         if (epoch + 1) == epochs or (save_img_every_n_epochs and (epoch + 1) % save_img_every_n_epochs == 0):
             save_img(model=ema_model.ema_model,
@@ -144,7 +147,10 @@ if __name__ == '__main__':
     config = load_config(args)
     
     if args.mode == 'train_c':
-        exp_path = choose_experiment()
+        if args.experiment is None:
+            exp_path = choose_experiment()
+        else:
+            exp_path = args.experiment
         model, ema_model, data_loader, optimizer, scheduler, epoch, best_loss, noise_for_imgs, config = load_checkpoint(exp_path)
     else:
         model = init_model(config)
