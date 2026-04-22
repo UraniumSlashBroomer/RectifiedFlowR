@@ -96,7 +96,7 @@ def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion
     if noise_for_imgs is None:
         noise_for_imgs = torch.randn(size=(config['checkpoint']['img_B'], model.in_channels, model.img_size, model.img_size)).to(device)
     else:
-        noise_for_imgs.to(device)
+        noise_for_imgs = noise_for_imgs.to(device)
 
     model = model.train()
     avg_loss = None
