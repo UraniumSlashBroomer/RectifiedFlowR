@@ -24,6 +24,9 @@ train:
     weight_decay: 0.0
   process:
     epochs: 500
+  scheduler:
+    type: 'CosineAnnealingLR'
+    eta_min: 1.0e-06
 
 checkpoint:
   img_save_every_n_epochs: 100

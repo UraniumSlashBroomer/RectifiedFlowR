@@ -41,6 +41,9 @@ def parse_args():
     parser.add_argument(
             '--experiment', type=str)
 
+    parser.add_argument(
+            '--decay', type=float)
+
     return parser.parse_args()
 
 
@@ -144,15 +147,15 @@ def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion
 
 if __name__ == '__main__':
     args = parse_args()
-    config = load_config(args)
     
     if args.mode == 'train_c':
         if args.experiment is None:
             exp_path = choose_experiment()
         else:
             exp_path = args.experiment
-        model, ema_model, data_loader, optimizer, scheduler, epoch, best_loss, noise_for_imgs, config = load_checkpoint(exp_path)
+        model, ema_model, data_loader, optimizer, scheduler, epoch, best_loss, noise_for_imgs, config = load_train_checkpoint(exp_path, args)
     else:
+        config = load_config(args)
         model = init_model(config)
         ema_model = init_ema(model, config)
         optimizer = init_optimizer(model, config)

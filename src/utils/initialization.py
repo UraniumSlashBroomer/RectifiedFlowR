@@ -76,7 +76,10 @@ def init_scheduler(optimizer, config):
     
     scheduler = None
     data_config = config['train']['data']
-    total_batches = data_config['num_training'] // data_config['batch_size'] * config['train']['process']['epochs']
+    if data_config['num_training'] < data_config['batch_size']:
+        total_batches = config['train']['process']['epochs']
+    else:
+        total_batches = data_config['num_training'] // data_config['batch_size'] * config['train']['process']['epochs']
 
     if type == 'CosineAnnealingLR':
         eta_min = config['train']['scheduler']['eta_min']
@@ -89,11 +92,10 @@ def init_scheduler(optimizer, config):
     return scheduler
     
 
-def load_checkpoint(experiment_path):
+def load_train_checkpoint(experiment_path, args):
     config_path, checkpoint_path = get_config_checkpoint_path(experiment_path)
 
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
+    config = load_config(args, config_path)
 
     model = init_model(config)
     ema_model = init_ema(model, config)
@@ -116,12 +118,28 @@ def load_checkpoint(experiment_path):
 
     return model, ema_model, data_loader, optimizer, scheduler, epoch, avg_loss, noise_for_imgs, config
 
+def load_eval_checkpoint(experiment_path):
+    config_path, checkpoint_path = get_config_checkpoint_path(experiment_path)
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
 
-def load_config(args):
+    model = init_model(config)
+    ema_model = init_ema(model, config)
+
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+
+    ema_model.load_state_dict(checkpoint['ema_model_state_dict'])
+
+    return ema_model, config
+
+
+def load_config(args, config_path=None):
     if args.mode == 'debug':
         args.config = 'configs/debug_config.yaml'
     elif args.mode == 'overfit':
         args.config = 'configs/overfit_config.yaml'
+    elif args.mode == 'train_c':
+        args.config = config_path
 
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
@@ -139,4 +157,7 @@ def load_config(args):
     if args.num_training is not None:
         config['train']['data']['num_training'] = args.num_training
     
+    if args.decay is not None:
+        config['model']['ema_model']['decay'] = args.decay
+
     return config

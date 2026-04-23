@@ -24,7 +24,7 @@ train:
     weight_decay: 0.001
   scheduler:
     type: 'CosineAnnealingLR'
-    eta_min: 1e-6
+    eta_min: 1.0e-06
   process:
     epochs: 250
 

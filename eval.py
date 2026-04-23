@@ -1,4 +1,4 @@
-from src.utils.initialization import load_checkpoint
+from src.utils.initialization import load_eval_checkpoint
 from src.utils.utils import sample, choose_experiment
 import argparse
 import numpy as np
@@ -17,7 +17,7 @@ def parse_args():
 
 
 def load_experiment(experiment_path):
-    _, ema_model, _, _, _, _, _, _, config = load_checkpoint(experiment_path)
+    ema_model, config = load_eval_checkpoint(experiment_path)
     model = ema_model.ema_model
     return model, config
  
