@@ -96,7 +96,6 @@ def load_train_checkpoint(experiment_path, args):
     config_path, checkpoint_path = get_config_checkpoint_path(experiment_path)
 
     config = load_config(args, config_path)
-
     model = init_model(config)
     ema_model = init_ema(model, config)
     data_loader = init_data_loader(config)

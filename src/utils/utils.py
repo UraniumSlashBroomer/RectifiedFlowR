@@ -4,6 +4,7 @@ from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
+from .solvers import *
 
 @torch.no_grad()
 def save_img(model, B, T, device, path, epoch, noise_for_img, with_process=True, save_with_plt=True):
@@ -68,22 +69,10 @@ def sample(model, B, T, device, noise=None, with_process=False):
         else:
             sample = noise
 
-        t = torch.linspace(0, 1, T).to(device) # [T]
+        output = euler_solver(model, T, device, sample, with_process) 
 
-        if with_process:
-            output = torch.zeros(size=(T, B, model.in_channels, model.img_size, model.img_size)).to(device)
-            output[0, :, :, :] = sample
-
-        for i in range(len(t) - 1):
-            t_curr = torch.ones(size=(B, 1, 1)).to(device) * t[i] # [B, 1] * T = [B, T]
-            dt = t[i + 1] - t[i]
-
-            sample = sample + dt * model(sample, t_curr)
-            if with_process:
-                output[i + 1, :, :, :] = sample
-        
         if not(with_process):
-            return sample.permute(0, 2, 3, 1).cpu().detach().numpy()
+            return output.permute(0, 2, 3, 1).cpu().detach().numpy()
         return output.permute(1, 3, 0, 4, 2).cpu().detach().numpy() # [T, B, C, H, W] -> [B, H, T, W, C]
 
 

@@ -34,8 +34,10 @@ if __name__ == '__main__':
 
     while True:
         B, T = map(int, input().split())
-        imgs = sample(model, B, T, device, with_process=True)
-        imgs = imgs.reshape(B * H, T * W, C)
+        imgs = sample(model, B, T, device, with_process=False)
+        imgs = imgs.reshape(B * H, W, C)
+
+        # imgs = imgs.reshape(B * H, T * W, C)
         imgs = np.clip(imgs, a_min=-1, a_max=1)
         imgs = 255 * ((imgs + 1) / 2)
         imgs = imgs.astype(np.uint8)
@@ -43,10 +45,10 @@ if __name__ == '__main__':
         fig, ax = plt.subplots(figsize=(15, 10))
         ax.imshow(imgs)
         
-        one_frame_w = imgs.shape[1] / T 
-        tick_positions = np.arange(T) * one_frame_w + one_frame_w / 2
-        ax.set_xticks(tick_positions)
-        ax.set_xticklabels(f"T={i}" for i in range(T))
-        ax.set_yticks([])
+        # one_frame_w = imgs.shape[1] / T 
+        # tick_positions = np.arange(T) * one_frame_w + one_frame_w / 2
+        # ax.set_xticks(tick_positions)
+        # ax.set_xticklabels(f"T={i}" for i in range(T))
+        # ax.set_yticks([])
 
         fig.show()
