@@ -13,11 +13,15 @@ def parse_args():
             default='cpu',
             help='which device to use on local machine')
     
+    parser.add_argument(
+            '--solver', type=str,
+            default='odeint')
+
     return parser.parse_args()
 
 
-def load_experiment(experiment_path):
-    ema_model, config = load_eval_checkpoint(experiment_path)
+def load_experiment(experiment_path, args):
+    ema_model, config = load_eval_checkpoint(experiment_path, args)
     model = ema_model.ema_model
     return model, config
  
@@ -27,14 +31,18 @@ if __name__ == '__main__':
     device = args.device
     
     exp_path = choose_experiment()
-    model, config = load_experiment(exp_path)
+    model, config = load_experiment(exp_path, args)
     
     H = W = model.img_size
     C = model.in_channels
 
     while True:
-        B, T = map(int, input().split())
-        imgs = sample(model, B, T, device, with_process=False)
+        if args.solver == 'odeint':
+            B = int(input("B: "))
+            T = 0
+        else:
+            B, T = map(int, input("B, T: ").split())
+        imgs = sample(model, B, T, device, solver=args.solver, with_process=False)
         imgs = imgs.reshape(B * H, W, C)
 
         # imgs = imgs.reshape(B * H, T * W, C)

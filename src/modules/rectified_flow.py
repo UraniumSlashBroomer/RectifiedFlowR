@@ -130,13 +130,17 @@ class RectifiedFlowViT(nn.Module):
         self.img_size = img_size
         self.in_channels = in_channels
         self.patch_size = patch_size
-        
+        self.grid_size = img_size // patch_size
+
         self.n_heads = n_heads
     
         self.time_embedding = TimeEmbedding(emb_dim)
 
         if positional_encoding == 'sincos':
-            self.positional_encoding = PositionalEncodingSinCos(emb_dim, p_pos_encoding_dropout)
+            self.positional_encoding = PositionalEncodingSinCos(emb_dim=emb_dim,
+                                                                grid_size=self.grid_size,
+                                                                p_dropout=p_pos_encoding_dropout)
+
         elif positional_encoding == 'emb':
             n_patches = (img_size // patch_size) ** 2
             self.positional_encoding = PositionalEncodingEmb(n_patches=n_patches,
@@ -160,13 +164,15 @@ class RectifiedFlowViT(nn.Module):
                                      out_channels=in_channels)
 
         self.final_norm = nn.LayerNorm(emb_dim)
+
+        self.apply(self._init_weights)
     
     def _init_weights(self, module):
         if isinstance(module, (nn.Linear, nn.Embedding)):
             module.weight.data.normal_(mean=0.0, std=0.02)
             if isinstance(module, nn.Linear) and module.bias is not None:
                 module.bias.data.zero_()
-        elif isinstance(module, nn.LayerNorm):
+        elif isinstance(module, nn.LayerNorm) and module.bias is not None:
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
         elif isinstance(module, AdaLN_EncoderLayer):
@@ -176,7 +182,7 @@ class RectifiedFlowViT(nn.Module):
     def forward(self, x, t):
         """
         input: images [B, C, N, N],
-        t [B, 1]
+        t [B, 1, 1]
         """
         t = self.time_embedding(t)
         x = self.patch_embedding(x) # [B, S, E]

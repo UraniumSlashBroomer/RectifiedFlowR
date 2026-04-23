@@ -23,27 +23,45 @@ class PositionalEncodingEmb(nn.Module):
 
 
 class PositionalEncodingSinCos(nn.Module):
-    def __init__(self, emb_dim, p_dropout=0.0, max_length=5000):
+    def __init__(self, emb_dim, grid_size, p_dropout=0.0):
         super().__init__()
         assert emb_dim % 2 == 0, "emb dim should be divisble by 2"
         
         self.dropout = nn.Dropout(p_dropout)
 
-        pe = torch.zeros(1, max_length, emb_dim)
+        half_dim = emb_dim // 2
+        sincosemb = torch.exp(torch.arange(0, half_dim, 2, dtype=torch.float32) * -(math.log(10000.0) / half_dim)).reshape(1, 1, -1)
+        self.register_buffer("sincosemb", sincosemb)
 
-        for i in range(max_length):
-            for j in range(emb_dim):
-                pe[:, i, j] = math.sin(i * (10000 ** (-j / emb_dim))) if j % 2 == 0 else math.cos(i * (10000 ** (-(j - 1) / emb_dim)))
+        grid_x, grid_y = torch.meshgrid(
+                torch.arange(grid_size, dtype=torch.float32),
+                torch.arange(grid_size, dtype=torch.float32),
+                indexing='xy'
+                )
+        
+        grid_x = grid_x.reshape(1, -1)
+        grid_y = grid_y.reshape(1, -1)
+
+        pe_x = self._get_1d_sincos_enc(grid_x)
+        pe_y = self._get_1d_sincos_enc(grid_y)
+
+        pe = torch.cat([pe_x, pe_y], dim=-1)
 
         self.register_buffer("pe", pe)
+    
+    def _get_1d_sincos_enc(self, pos):
+        sincosemb = pos.unsqueeze(-1) * self.sincosemb
+
+        emb_sin = torch.sin(sincosemb)
+        emb_cos = torch.cos(sincosemb)
+
+        return torch.cat([emb_sin, emb_cos], dim=-1)
 
     def forward(self, x):
         """
         input: x [B, S, E]
         """
-        _, S, _ = x.shape
-        x = self.dropout(x + self.pe[:, :S, :])
-        
+        x = self.dropout(x + self.pe)
         return x
 
 
@@ -188,9 +206,12 @@ class ViT(nn.Module):
         self.img_size = img_size
         self.in_channels = in_channels
         self.patch_size = patch_size
+        self.grid_size = img_size // patch_size
 
         if positional_encoding == 'sincos':
-            self.positional_encoding = PositionalEncodingSinCos(emb_dim, p_pos_encoding_dropout)
+            self.positional_encoding = PositionalEncodingSinCos(emb_dim=emb_dim,
+                                                                grid_size=self.grid_size,
+                                                                p_dropout=p_pos_encoding_dropout)
         elif positional_encoding == 'emb':
             n_patches = (img_size // patch_size) ** 2
             self.positional_encoding = PositionalEncodingEmb(n_patches=n_patches,

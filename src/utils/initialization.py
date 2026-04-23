@@ -16,6 +16,9 @@ def init_model(config):
     ffn_dim_ratio = model_config['ffn_dim_ratio']
     n_heads = model_config['n_heads']
     num_layers = model_config['num_layers']
+    positional_encoding = model_config['positional_encoding']
+    p_pos_encoding_dropout = model_config['p_pos_encoding_dropout']
+    p_encoder_dropout = model_config['p_encoder_dropout']
 
     model = RectifiedFlowViT(img_size=img_size,
                              in_channels=in_channels,
@@ -23,7 +26,10 @@ def init_model(config):
                              emb_dim=emb_dim,
                              ffn_dim_ratio=ffn_dim_ratio,
                              n_heads=n_heads,
-                             num_layers=num_layers).to(device)
+                             num_layers=num_layers,
+                             positional_encoding=positional_encoding,
+                             p_pos_encoding_dropout=p_pos_encoding_dropout,
+                             p_encoder_dropout=p_encoder_dropout).to(device)
 
     return model
 
@@ -117,10 +123,11 @@ def load_train_checkpoint(experiment_path, args):
 
     return model, ema_model, data_loader, optimizer, scheduler, epoch, avg_loss, noise_for_imgs, config
 
-def load_eval_checkpoint(experiment_path):
+def load_eval_checkpoint(experiment_path, args):
     config_path, checkpoint_path = get_config_checkpoint_path(experiment_path)
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
+        config['device'] = args.device
 
     model = init_model(config)
     ema_model = init_ema(model, config)

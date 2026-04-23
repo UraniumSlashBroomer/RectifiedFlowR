@@ -19,10 +19,11 @@ train:
   optimizer:
     lr: 0.0003
     weight_decay: 0.00001
+  scheduler:
+    type: 'CosineAnnealingLR'
+    eta_min: 1.0e-06
   process:
     epochs: 2
-  scheduler:
-
 
 checkpoint:
   img_save_every_n_epochs: 1

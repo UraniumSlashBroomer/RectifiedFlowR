@@ -56,7 +56,7 @@ def save_img_with_plt(grid, choosed_Ts, epoch, result_path):
 
 
 @torch.no_grad()
-def sample(model, B, T, device, noise=None, with_process=False):
+def sample(model, B, T, device, noise=None, solver='euler', with_process=False):
         """
         input: T: int number, num of steps
                B: int number, num of samples
@@ -68,8 +68,17 @@ def sample(model, B, T, device, noise=None, with_process=False):
             sample = torch.randn(B, model.in_channels, model.img_size, model.img_size).to(device)
         else:
             sample = noise
-
-        output = euler_solver(model, T, device, sample, with_process) 
+        
+        if solver == 'euler':
+            output = euler_solver(model, T, device, sample, with_process) 
+        elif solver == 'heun':
+            output = heun_solver(model, T, device, sample, with_process)
+        elif solver == 'odeint':
+            with_process = False
+            output = odeint_solver(model, device, sample)
+        else:
+            print(f"please, provide possible solver")
+            raise ValueError 
 
         if not(with_process):
             return output.permute(0, 2, 3, 1).cpu().detach().numpy()
