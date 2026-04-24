@@ -7,8 +7,8 @@ model:
   n_heads: 8
   num_layers: 8
   positional_encoding: 'sincos'
-  p_pos_encoding_dropout: 0.2
-  p_encoder_dropout: 0.2
+  p_pos_encoding_dropout: 0.05
+  p_encoder_dropout: 0.20
 
   ema_model:
     decay: 0.999
@@ -17,16 +17,20 @@ train:
   data:
     num_training: 49000
     num_validation: 1000
-    batch_size: 196
+    batch_size: 192
     drop_last: true
   optimizer:
-    lr: 0.0001
-    weight_decay: 0.001
+    lr: 1.0e-4
+    weight_decay: 1.0e-4
   scheduler:
     type: 'CosineAnnealingLR'
     eta_min: 1.0e-06
+    warmup:
+      type: 'linear'
+      start_factor: 0.05
+      epochs: 20
   process:
-    epochs: 250
+    epochs: 500
 
 checkpoint:
   img_save_every_n_epochs: 10

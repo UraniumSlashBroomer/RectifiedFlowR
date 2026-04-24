@@ -8,6 +8,7 @@ import yaml
 import shutil
 from tqdm import tqdm
 from datetime import datetime
+import wandb
 
 
 def parse_args():
@@ -44,6 +45,13 @@ def parse_args():
 
     parser.add_argument(
             '--decay', type=float)
+
+    parser.add_argument(
+            '--warmup_epochs', type=int)
+
+    parser.add_argument(
+            '--wandb', type=bool,
+            default=False)
 
     return parser.parse_args()
 
@@ -92,7 +100,7 @@ def save_checkpoint(epoch, epochs, save_model_every_n_epochs, model, ema_model, 
         torch.save(checkpoint, os.path.join(save_dir, "checkpoint.pth"))
 
 
-def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion, data_loader, config, start_epoch=0, noise_for_imgs=None, debug=False):
+def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion, data_loader, config, start_epoch=0, noise_for_imgs=None, debug=False, wandb_run=None):
     epochs = config['train']['process']['epochs']
     device = config['device']
     save_model_every_n_epochs, save_img_every_n_epochs, save_img_path, save_dir = prepare_saving(model, config, start_epoch, debug)
@@ -128,9 +136,15 @@ def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion
             ema_model.update(model)
             total_num += B
             total_loss += batch_loss.item() * B
-
+    
         avg_loss = total_loss / total_num
         save_checkpoint(epoch + 1, epochs, save_model_every_n_epochs, model, ema_model, optimizer, scheduler, noise_for_imgs, avg_loss, save_dir)
+        
+        if scheduler is not None:
+            last_lr = scheduler.get_last_lr()
+        else:
+            for param_group in optimizer.param_groups:
+                last_lr = param_group['lr']
 
         if (epoch + 1) == epochs or (save_img_every_n_epochs and (epoch + 1) % save_img_every_n_epochs == 0):
             save_img(model=ema_model.ema_model,
@@ -141,6 +155,12 @@ def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion
                      device=device,
                      noise_for_img=noise_for_imgs,
                      with_process=True)
+        
+        if wandb_run:
+            wandb_run.log({
+                "loss": avg_loss,
+                "lr": last_lr
+                })
 
         print(f"epoch {epoch + 1}/{epochs}. Loss: {avg_loss:.4f}")
     return avg_loss
@@ -165,6 +185,19 @@ if __name__ == '__main__':
         epoch = 0
         noise_for_imgs = None
         avg_loss = None
+    
+    if args.wandb is True:
+        run = wandb.init(
+                entity='milkorehov_rtu_mirea',
+                project='rectified_flow_cifar10',
+                config=config)
+        
+        try:
+            model_log_freq = config['wandb']['model_log_freq']
+        except KeyError:
+            model_log_freq = max(data_config['num_training'] // data_config['batch_size'], 1)
+
+        wandb.watch(model, log='all', log_freq=model_log_freq)
 
     loss_instance = torch.nn.MSELoss()
     debug_mode = args.mode == 'debug'
@@ -176,4 +209,8 @@ if __name__ == '__main__':
                                config=config,
                                start_epoch=epoch,
                                noise_for_imgs=noise_for_imgs,
-                               debug=debug_mode)
+                               debug=debug_mode,
+                               wandb_run=run)
+
+    if args.wandb is True:
+        run.finish()

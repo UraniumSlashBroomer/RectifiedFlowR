@@ -11,7 +11,7 @@ model:
   p_encoder_dropout: 0.0
 
   ema_model:
-    decay: 0.8
+    decay: 0.85
 
 train:
   data:

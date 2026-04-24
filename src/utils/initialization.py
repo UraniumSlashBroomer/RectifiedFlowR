@@ -30,6 +30,8 @@ def init_model(config):
                              positional_encoding=positional_encoding,
                              p_pos_encoding_dropout=p_pos_encoding_dropout,
                              p_encoder_dropout=p_encoder_dropout).to(device)
+    
+    print(f"total params: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
     return model
 
@@ -69,7 +71,9 @@ def init_optimizer(model, config):
     lr = optimizer_config['lr']
     weight_decay = optimizer_config['weight_decay']
     
-    optimizer = torch.optim.Adam(lr=lr, params=model.parameters(), weight_decay=weight_decay)
+    optimizer = torch.optim.AdamW(lr=lr,
+                                  params=model.parameters(),
+                                  weight_decay=weight_decay)
     
     return optimizer
 
@@ -80,22 +84,55 @@ def init_scheduler(optimizer, config):
     except KeyError:
         type = None
     
+    try:
+        warmup_type = config['train']['scheduler']['warmup']['type']
+        warmup_epochs = config['train']['scheduler']['warmup']['epochs']
+        warmup_start_factor = config['train']['scheduler']['warmup']['start_factor']
+        assert warmup_epochs < config['train']['process']['epochs'], f"warmup epochs should be less than total epochs"
+    except KeyError:
+        warmup_type = None
+        warmup_epochs = 0
+
     scheduler = None
+    warmup_scheduler = None
+    constant_scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lambda epoch: 1.0)
+    result_scheduler = None
+
     data_config = config['train']['data']
     if data_config['num_training'] < data_config['batch_size']:
-        total_batches = config['train']['process']['epochs']
+        batches_in_epoch = 1
     else:
-        total_batches = data_config['num_training'] // data_config['batch_size'] * config['train']['process']['epochs']
+        batches_in_epoch = data_config['num_training'] // data_config['batch_size']
+
+    total_warmup_batches = batches_in_epoch * warmup_epochs
+    total_scheduler_batches =  batches_in_epoch * config['train']['process']['epochs'] - total_warmup_batches
 
     if type == 'CosineAnnealingLR':
         eta_min = config['train']['scheduler']['eta_min']
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer,
-                                                               T_max=total_batches,
+                                                               T_max=total_scheduler_batches,
                                                                eta_min=eta_min)
     else:
         print(f"no scheduler in config")
+
+    if warmup_type == 'linear':
+        warmup_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer=optimizer,
+                                          start_factor=warmup_start_factor,
+                                          total_iters=total_warmup_batches)
+    else:
+        print(f"no warmup in config")
     
-    return scheduler
+    if scheduler is not None and warmup_scheduler is not None:
+        result_scheduler = torch.optim.lr_scheduler.SequentialLR(
+                optimizer,
+                schedulers=[warmup_scheduler, scheduler, constant_scheduler],
+                milestones=[total_warmup_batches, total_warmup_batches + total_scheduler_batches + 1])
+    elif scheduler is not None:
+        result_scheduler = torch.optim.lr_scheduler(optimizer,
+                                                    schedulers=[scheduler, constant_scheduler],
+                                                    milestones=[total_scheduler_batches + 1])
+        
+    return result_scheduler
     
 
 def load_train_checkpoint(experiment_path, args):
@@ -165,5 +202,8 @@ def load_config(args, config_path=None):
     
     if args.decay is not None:
         config['model']['ema_model']['decay'] = args.decay
+
+    if args.warmup_epochs is not None:
+        config['train']['scheduler']['warmup']['epochs'] = args.warmup_epochs
 
     return config

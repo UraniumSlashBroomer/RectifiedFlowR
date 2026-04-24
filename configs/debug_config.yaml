@@ -22,6 +22,10 @@ train:
   scheduler:
     type: 'CosineAnnealingLR'
     eta_min: 1.0e-06
+    warmup:
+      type: 'linear'
+      start_factor: 0.05
+      epochs: 1
   process:
     epochs: 2
 
@@ -29,5 +33,5 @@ checkpoint:
   img_save_every_n_epochs: 1
   img_B: 2
   img_T: 10
-  model_save_every_n_epochs: 0
+  model_save_every_n_epochs: 1
   saveroot: results/debug/
