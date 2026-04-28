@@ -30,11 +30,11 @@ train:
       start_factor: 0.05
       epochs: 20
   process:
-    epochs: 500
+    epochs: 700
 
 checkpoint:
   img_save_every_n_epochs: 10
   img_B: 10
-  img_T: 100
-  model_save_every_n_epochs: 2
+  img_T: 301
+  model_save_every_n_epochs: 1
   saveroot: results/

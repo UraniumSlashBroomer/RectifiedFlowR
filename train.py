@@ -141,7 +141,7 @@ def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion
         save_checkpoint(epoch + 1, epochs, save_model_every_n_epochs, model, ema_model, optimizer, scheduler, noise_for_imgs, avg_loss, save_dir)
         
         if scheduler is not None:
-            last_lr = scheduler.get_last_lr()
+            last_lr = scheduler.get_last_lr()[0]
         else:
             for param_group in optimizer.param_groups:
                 last_lr = param_group['lr']
@@ -188,13 +188,13 @@ if __name__ == '__main__':
     
     if args.wandb is True:
         run = wandb.init(
-                entity='milkorehov_rtu_mirea',
                 project='rectified_flow_cifar10',
                 config=config)
         
         try:
             model_log_freq = config['wandb']['model_log_freq']
         except KeyError:
+            data_config = config['train']['data']
             model_log_freq = max(data_config['num_training'] // data_config['batch_size'], 1)
 
         wandb.watch(model, log='all', log_freq=model_log_freq)
