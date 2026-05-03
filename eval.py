@@ -38,25 +38,35 @@ if __name__ == '__main__':
 
     while True:
         if args.solver == 'odeint':
-            B = int(input("B: "))
+            rows, columns = map(int, input("rows, columns: ").split())
             T = 0
         else:
-            B, T = map(int, input("B, T: ").split())
-        imgs = sample(model, B, T, device, solver=args.solver, with_process=False)
-        imgs = imgs.reshape(B * H, W, C)
+            rows, columns, T = map(int, input("rows, columns, T: ").split())
 
-        # imgs = imgs.reshape(B * H, T * W, C)
+        B = rows * columns
+        imgs = sample(model, B, T, device, solver=args.solver, with_process=False) # [B, H, W, C]
+        # imgs = imgs.reshape(B * H, W, C) #
         imgs = np.clip(imgs, a_min=-1, a_max=1)
         imgs = 255 * ((imgs + 1) / 2)
         imgs = imgs.astype(np.uint8)
         
-        fig, ax = plt.subplots(figsize=(15, 10))
-        ax.imshow(imgs)
+        fig, axes = plt.subplots(rows, columns, figsize=(12, 12))
+        axes = axes.flatten()
+
+        for i, ax in enumerate(axes):
+            img = imgs[i]
+            axes[i].imshow(img)
+            axes[i].axis('off')
         
+        plt.tight_layout()
+        fig.tight_layout()
+        fig.savefig('results.png', bbox_inches='tight')
+        plt.show()
+        # fig.show()
+
         # one_frame_w = imgs.shape[1] / T 
         # tick_positions = np.arange(T) * one_frame_w + one_frame_w / 2
         # ax.set_xticks(tick_positions)
         # ax.set_xticklabels(f"T={i}" for i in range(T))
         # ax.set_yticks([])
 
-        fig.show()

@@ -53,6 +53,10 @@ def parse_args():
             '--wandb', type=bool,
             default=False)
 
+    parser.add_argument(
+            '--wandb_run_name', type=str,
+            default='')
+
     return parser.parse_args()
 
 
@@ -189,6 +193,7 @@ if __name__ == '__main__':
     if args.wandb is True:
         run = wandb.init(
                 project='rectified_flow_cifar10',
+                id=args.wandb_run_name,
                 config=config)
         
         try:

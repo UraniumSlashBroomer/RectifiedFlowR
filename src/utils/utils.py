@@ -81,7 +81,7 @@ def sample(model, B, T, device, noise=None, solver='euler', with_process=False):
             raise ValueError 
 
         if not(with_process):
-            return output.permute(0, 2, 3, 1).cpu().detach().numpy()
+            return output.permute(0, 2, 3, 1).cpu().detach().numpy() # [B, H, W, C]
         return output.permute(1, 3, 0, 4, 2).cpu().detach().numpy() # [T, B, C, H, W] -> [B, H, T, W, C]
 
 
