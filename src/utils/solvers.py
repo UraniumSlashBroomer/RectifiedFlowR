@@ -1,7 +1,8 @@
 import torch
 import torchdiffeq
 
-def euler_solver(model, T, device, sample, with_process=False):
+
+def euler_solver(model, T, device, sample, T_indexes=None, with_process=False):
     """
     output shape if with_process:
         [T, B, C, H, W]
@@ -10,11 +11,14 @@ def euler_solver(model, T, device, sample, with_process=False):
     """
 
     t = torch.linspace(0, 1, T).to(device) # [T]
+
     B, C, img_size, img_size = sample.shape
-    output = torch.zeros_like(sample)
 
     if with_process:
-        output = torch.zeros(size=(T, B, C, img_size, img_size))
+        assert T_indexes is not None, f"choosed indexes not provided"
+        T_pointer = 1
+
+        output = torch.zeros(size=(len(T_indexes), B, C, img_size, img_size))
         output[0] = sample
 
     for i in range(len(t) - 1):
@@ -22,22 +26,25 @@ def euler_solver(model, T, device, sample, with_process=False):
         dt = t[i + 1] - t[i] # scalar
 
         sample = sample + dt * model(sample, t_curr)
-        if with_process:
-            output[i + 1, :, :, :] = sample
+        if with_process and (i + 1) == T_indexes[T_pointer]:
+            output[T_pointer] = sample
+            T_pointer += 1
     
     if with_process:
         return output
     return sample
 
 
-def heun_solver(model, T, device, sample, with_process=False):
+def heun_solver(model, T, device, sample, T_indexes=None, with_process=False):
     t = torch.linspace(0, 1, T).to(device)
 
     B, C, img_size, img_size = sample.shape
-    output = torch.zeros_like(sample)
 
     if with_process:
-        output = torch.zeros(size=(T, B, C, img_size, img_size))
+        assert T_indexes is not None, f"choosed indexes not provided"
+        T_pointer = 1
+
+        output = torch.zeros(size=(len(T_indexes), B, C, img_size, img_size))
         output[0] = sample
 
     for i in range(len(t) - 1):
@@ -50,8 +57,9 @@ def heun_solver(model, T, device, sample, with_process=False):
         speed_2 = model(x_next, t_next)
         sample = sample + 0.5 * (speed_1 + speed_2) * dt
 
-        if with_process:
-            output[i + 1] = sample
+        if with_process and (i + 1) == T_indexes[T_pointer]:
+            output[T_pointer] = sample
+            T_pointer += 1
 
     if with_process:
         return output

@@ -123,10 +123,8 @@ python train.py
 
 - Тестирование модели:
 ```
-python eval.py --device --solver['euler', 'heun', default='odeint']
+python eval.py --device --solver['euler', 'heun', default='odeint'] --mode=['grid', 'process']
 ```
-
-После выбора эксперимента загружается модель и нужно ввести кол-во изображений для генерации и T если это требуется.
 
 # English:
 
@@ -222,10 +220,8 @@ Everything run in debug mode is saved to the results/debug folder (it will be ov
 
 - Model Testing:
 ```
-python eval.py --device --solver['euler', 'heun', default='odeint']
+python eval.py --device --solver['euler', 'heun', default='odeint'] --mode=['grid', 'process']
 ```
-
-Once you have selected an experiment, the model will be loaded, and you will need to enter the number of images to generate and T (number of steps) if required.
 
 ---
 

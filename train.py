@@ -151,15 +151,17 @@ def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion
                 last_lr = param_group['lr']
 
         if (epoch + 1) == epochs or (save_img_every_n_epochs and (epoch + 1) % save_img_every_n_epochs == 0):
-            save_img(model=ema_model.ema_model,
-                     B=config['checkpoint']['img_B'],
-                     T=config['checkpoint']['img_T'], 
-                     path=save_img_path,
-                     epoch=epoch + 1,
-                     device=device,
-                     noise_for_img=noise_for_imgs,
-                     with_process=True)
-        
+            sample_and_save(model=ema_model.ema_model,
+                            B=config['checkpoint']['img_B'],
+                            T=config['checkpoint']['img_T'],
+                            path=save_img_path,
+                            title=f"epoch {epoch + 1}",
+                            file_name=epoch + 1,
+                            noise_for_img=noise_for_imgs,
+                            device=device,
+                            with_process=True,
+                            solver='euler')
+
         if wandb_run:
             wandb_run.log({
                 "loss": avg_loss,
@@ -194,6 +196,7 @@ if __name__ == '__main__':
         run = wandb.init(
                 project='rectified_flow_cifar10',
                 id=args.wandb_run_name,
+                resume='allow',
                 config=config)
         
         try:
@@ -203,6 +206,8 @@ if __name__ == '__main__':
             model_log_freq = max(data_config['num_training'] // data_config['batch_size'], 1)
 
         wandb.watch(model, log='all', log_freq=model_log_freq)
+    else:
+        run = None
 
     loss_instance = torch.nn.MSELoss()
     debug_mode = args.mode == 'debug'
