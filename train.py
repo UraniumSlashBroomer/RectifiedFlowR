@@ -16,8 +16,7 @@ def parse_args():
 
     parser.add_argument(
             '--config', type=str,
-            help='name of config file to load',
-            default='configs/default_config.yaml')
+            help='name of config file to load')
 
     parser.add_argument(
             '--device', type=str,
@@ -61,6 +60,7 @@ def parse_args():
 
 
 def prepare_saving(model, config, start_epoch, debug=False):
+    dataset_name = config['train']['data']['dataset']
     epochs = config['train']['process']['epochs']
     save_model_every_n_epochs = config['checkpoint']['model_save_every_n_epochs']
     save_img_every_n_epochs = config['checkpoint']['img_save_every_n_epochs']
@@ -69,7 +69,7 @@ def prepare_saving(model, config, start_epoch, debug=False):
     # savedir and save config
     if not(debug):
         run_id_part_1 = datetime.now().strftime("%Y-%m-%d")
-        run_id_part_2 = datetime.now().strftime("%H-%M-%S") + f"ViT-{model.n_heads}_{model.patch_size}_ep_{start_epoch}_{epochs}"
+        run_id_part_2 = datetime.now().strftime("%H-%M-%S") + f"{dataset_name}ViT-{model.n_heads}_{model.patch_size}_ep_{start_epoch}_{epochs}"
         run_id = os.path.join(run_id_part_1, run_id_part_2)
         save_dir = os.path.join(config['checkpoint']['saveroot'], run_id)
         os.makedirs(save_dir, exist_ok=True)
@@ -104,7 +104,71 @@ def save_checkpoint(epoch, epochs, save_model_every_n_epochs, model, ema_model, 
         torch.save(checkpoint, os.path.join(save_dir, "checkpoint.pth"))
 
 
-def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion, data_loader, config, start_epoch=0, noise_for_imgs=None, debug=False, wandb_run=None):
+def train_loop(model, ema_model, scheduler, optimizer, data_loader, criterion, device):
+    total_loss, total_num = 0.0, 0.0
+    for x in tqdm(data_loader):
+        B, C, N, N = x.shape
+        x = x.to(device)
+        noise = torch.randn(size=(B, C, N, N)).to(device)
+        t = torch.rand(size=(B, 1, 1, 1)).to(device)
+        noised_image = (1 - t) * noise + t * x
+        target = x - noise # target vector field
+        pred = model(noised_image, t.reshape(B, 1, 1))
+        
+        optimizer.zero_grad()         
+        batch_loss = criterion(pred, target)
+        batch_loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        optimizer.step()
+        
+        if scheduler is not None:
+            scheduler.step()
+
+        ema_model.update(model)
+        total_num += B
+        total_loss += batch_loss.item() * B
+
+    return total_loss / total_num
+
+def reflow_loop(model, ema_model, scheduler, optimizer, data_loader, criterion, device):
+    total_loss, total_num = 0.0, 0.0
+    for z0, z1_hat in tqdm(data_loader):
+        B, _, _, _ = z0.shape
+        z0, z1_hat = z0.to(device), z1_hat.to(device)
+        t = torch.rand(size=(B, 1, 1, 1)).to(device)
+        noised_image = (1 - t) * z0 + t * z1_hat
+        target = z1_hat - z0 # target vector field
+        pred = model(noised_image, t.reshape(B, 1, 1))
+        
+        optimizer.zero_grad()         
+        batch_loss = criterion(pred, target)
+        batch_loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        optimizer.step()
+        
+        if scheduler is not None:
+            scheduler.step()
+
+        ema_model.update(model)
+        total_num += B
+        total_loss += batch_loss.item() * B
+
+    return total_loss / total_num
+
+
+def train_rectified_flow_model(model,
+                               ema_model,
+                               scheduler,
+                               optimizer,
+                               criterion,
+                               data_loader,
+                               config,
+                               start_epoch=0,
+                               noise_for_imgs=None,
+                               debug=False,
+                               reflow=False,
+                               wandb_run=None):
+    
     epochs = config['train']['process']['epochs']
     device = config['device']
     save_model_every_n_epochs, save_img_every_n_epochs, save_img_path, save_dir = prepare_saving(model, config, start_epoch, debug)
@@ -115,33 +179,18 @@ def train_rectified_flow_model(model, ema_model, scheduler, optimizer, criterion
         noise_for_imgs = noise_for_imgs.to(device)
 
     model = model.train()
+    train_func = reflow_loop if reflow else train_loop
     avg_loss = None
 
     for epoch in range(start_epoch, epochs):
-        total_loss, total_num = 0.0, 0.0
-        for x in tqdm(data_loader):
-            B, C, N, N = x.shape
-            x = x.float().to(device)
-            noise = torch.randn(size=(B, C, N, N)).to(device)
-            t = torch.rand(size=(B, 1, 1, 1)).to(device)
-            noised_image = (1 - t) * noise + t * x
-            target = x - noise # target vector field
-            pred = model(noised_image, t.reshape(B, 1, 1))
-            
-            optimizer.zero_grad()         
-            batch_loss = criterion(pred, target)
-            batch_loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
-            
-            if scheduler is not None:
-                scheduler.step()
+        avg_loss = train_func(model=model,
+                              ema_model=ema_model,
+                              scheduler=scheduler,
+                              optimizer=optimizer,
+                              data_loader=data_loader,
+                              criterion=criterion,
+                              device=device)
 
-            ema_model.update(model)
-            total_num += B
-            total_loss += batch_loss.item() * B
-    
-        avg_loss = total_loss / total_num
         save_checkpoint(epoch + 1, epochs, save_model_every_n_epochs, model, ema_model, optimizer, scheduler, noise_for_imgs, avg_loss, save_dir)
         
         if scheduler is not None:
@@ -220,6 +269,7 @@ if __name__ == '__main__':
                                start_epoch=epoch,
                                noise_for_imgs=noise_for_imgs,
                                debug=debug_mode,
+                               reflow=config['train']['data']['dataset'] == 'reflow',
                                wandb_run=run)
 
     if args.wandb is True:

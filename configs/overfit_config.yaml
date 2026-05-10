@@ -15,6 +15,7 @@ model:
 
 train:
   data:
+    dataset: 'CIFAR10'
     num_training: 1
     num_validation: 10
     batch_size: 32

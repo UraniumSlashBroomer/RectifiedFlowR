@@ -15,6 +15,7 @@ model:
 
 train:
   data:
+    dataset: 'CIFAR10'
     num_training: 49000
     num_validation: 1000
     batch_size: 128
@@ -24,6 +25,13 @@ train:
     weight_decay: 0.00001
   process:
     epochs: 250
+  scheduler:
+    type: 'CosineAnnealingLR'
+    eta_min: 1.0e-06
+    warmup:
+      type: 'linear'
+      start_factor: 0.05
+      epochs: 20
 
 checkpoint:
   img_save_every_n_epochs: 10

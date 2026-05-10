@@ -27,9 +27,8 @@ def parse_args():
 
 
 def load_experiment(experiment_path, args):
-    ema_model, config = load_eval_checkpoint(experiment_path, args)
-    model = ema_model.ema_model
-    return model, config
+    ema_model, config = load_eval_checkpoint(experiment_path, args.device)
+    return ema_model, config
  
 
 if __name__ == '__main__':

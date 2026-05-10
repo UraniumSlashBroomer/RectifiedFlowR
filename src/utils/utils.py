@@ -12,7 +12,7 @@ def format_img(img):
     shape [B, H, T, W, C] -> [B * H, T * W, C]
     pixel value [-1, -1] -> [0, 255]
     """
-
+    img = img.permute(1, 3, 0, 4, 2).detach().numpy() # [T, B, C, H, W] -> [B, H, T, W, C]
     B, H, T, W, C = img.shape
     img = img.reshape(B * H, T * W, C)
     img = np.clip(img, a_min=-1, a_max=1)
@@ -42,7 +42,7 @@ def sample_and_save(model, B, device, path, title, T=None, file_name=None, noise
                   solver=solver,
                   T_indexes=T_indexes,
                   with_process=with_process)
-    
+
     img = format_img(img)
     
     save_img(img, path, title, file_name, T_indexes, with_process)
@@ -119,7 +119,7 @@ def sample(model, B, device, T=None, noise=None, solver='euler', T_indexes=None,
 
     if not(with_process):
         output = output.unsqueeze(0) # [T, B, C, H, W], T = 1
-    return output.permute(1, 3, 0, 4, 2).cpu().detach().numpy() # [T, B, C, H, W] -> [B, H, T, W, C]
+    return output.cpu() # [T, B, C, H, W]
 
 
 def find_experiments(root_dir='results'):
@@ -133,6 +133,32 @@ def find_experiments(root_dir='results'):
     experiments.sort(key=lambda x: (x[1], x[0]), reverse=True)
     return experiments
 
+
+def choose_reflow_dataset():
+    """
+    return reflow folder path and flag (is user creating new one)
+    """
+    print(f"choose reflow dataset or type 0 for create new one: ")
+
+    datasets_path = pathlib.Path('src') / pathlib.Path('dataset') / pathlib.Path('reflow')
+    if not(datasets_path.exists()):
+        datasets_path.mkdir()
+
+    all_paths = [path for path in datasets_path.iterdir()]
+    if len(all_paths) == 0:
+        print(f"no reflow datasets, please type 0")
+
+    for ind, dir in enumerate(all_paths):
+        print(f"{ind + 1}. {dir}")
+    
+    answr = int(input())
+    if answr == 0:
+        folder_name = input(f"new folder name: ")
+        result_path = datasets_path / folder_name / 'reflow_data.pt'
+    else:
+        result_path = all_paths[answr - 1] / 'reflow_data.pt' 
+    return result_path, answr == 0
+    
 
 def get_config_checkpoint_path(experiment_path):
     if type(experiment_path) == str:

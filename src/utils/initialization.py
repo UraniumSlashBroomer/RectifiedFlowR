@@ -1,8 +1,9 @@
 import torch
-from .data_utils import get_CIFAR10_data
+from .data_utils import get_CIFAR10_data, generate_reflow_dataset
 from ..modules.rectified_flow import RectifiedFlowViT, EMAModel
-from .utils import get_config_checkpoint_path
+from .utils import get_config_checkpoint_path, choose_experiment, choose_reflow_dataset
 import yaml
+import pathlib
 
 
 def init_model(config):
@@ -46,21 +47,71 @@ def init_ema(model, config):
     return ema_model
 
 
+def init_reflow_data_loader(config, data_path, mode):
+    """
+    mode: [generate, load]
+    """
+    data_config = config['train']['data']
+    batch_size, T = data_config['batch_size'], data_config.get('reflow_T', 50) # default - 50 
+    data_loader = None
+
+    if mode == 'generate':
+        device = config['device']
+        num_training = data_config['num_training']
+        solver = data_config.get('reflow_solver', 'heun') # default - heun
+        
+        exp_path = choose_experiment()
+        ema_model, _ = load_eval_checkpoint(experiment_path=exp_path,
+                                            device=device)
+
+        assert batch_size <= num_training, f"check B for reflow, it can't be bigger than num training"
+        data_dict = generate_reflow_dataset(model=ema_model,
+                                device=device,
+                                num_training=num_training,
+                                B=batch_size, T=T, solver=solver)
+        dataset = torch.utils.data.TensorDataset(data_dict['X_train'], data_dict['y_train'])
+        if not(data_path.parent.exists()):
+            data_path.parent.mkdir()
+        torch.save(dataset, data_path)
+    elif mode == 'load':
+        dataset = torch.load(data_path, map_location='cpu', weights_only=False)
+    else:
+        raise Exception
+    
+    config['train']['data']['reflow_data_path'] = str(data_path)
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
+
+    return data_loader
+
+
 def init_data_loader(config):
     data_config = config['train']['data']
-
+    
+    dataset = data_config['dataset']
     num_training = data_config['num_training']
     num_validation = data_config['num_validation']
 
     batch_size = data_config['batch_size']
     drop_last = data_config['drop_last']
 
-    data_dict = get_CIFAR10_data(num_training, num_validation)
-    
-    if num_training < batch_size:
-        data_loader = torch.utils.data.DataLoader(data_dict['X_train'].repeat(batch_size // num_training, 1, 1, 1), batch_size=batch_size)
-    else:
-        data_loader = torch.utils.data.DataLoader(data_dict['X_train'], batch_size=batch_size, drop_last=drop_last)
+    data_loader = None
+
+    if dataset == 'reflow':
+        try:
+            path, new_one_flag = pathlib.Path(config['train']['data']['reflow_data_path']), False
+        except KeyError:
+            path, new_one_flag = choose_reflow_dataset()
+
+        data_loader = init_reflow_data_loader(config=config,
+                                              data_path=path,
+                                              mode='generate' if new_one_flag else 'load')
+    elif dataset == 'CIFAR10':
+        data_dict = get_CIFAR10_data(num_training, num_validation)
+
+        if num_training < batch_size:
+            data_loader = torch.utils.data.DataLoader(data_dict['X_train'].repeat(batch_size // num_training, 1, 1, 1), batch_size=batch_size, shuffle=True)
+        else:
+            data_loader = torch.utils.data.DataLoader(data_dict['X_train'], batch_size=batch_size, drop_last=drop_last, shuffle=True)
 
     return data_loader
 
@@ -141,9 +192,9 @@ def load_train_checkpoint(experiment_path, args):
     config = load_config(args, config_path)
     model = init_model(config)
     ema_model = init_ema(model, config)
-    data_loader = init_data_loader(config)
     optimizer = init_optimizer(model, config)
     scheduler = init_scheduler(optimizer, config)
+    data_loader = init_data_loader(config)
 
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
 
@@ -160,11 +211,12 @@ def load_train_checkpoint(experiment_path, args):
 
     return model, ema_model, data_loader, optimizer, scheduler, epoch, avg_loss, noise_for_imgs, config
 
-def load_eval_checkpoint(experiment_path, args):
+
+def load_eval_checkpoint(experiment_path, device):
     config_path, checkpoint_path = get_config_checkpoint_path(experiment_path)
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
-        config['device'] = args.device
+        config['device'] = device
 
     model = init_model(config)
     ema_model = init_ema(model, config)
@@ -173,16 +225,22 @@ def load_eval_checkpoint(experiment_path, args):
 
     ema_model.load_state_dict(checkpoint['ema_model_state_dict'])
 
-    return ema_model, config
+    return ema_model.ema_model, config
 
 
 def load_config(args, config_path=None):
-    if args.mode == 'debug':
-        args.config = 'configs/debug_config.yaml'
-    elif args.mode == 'overfit':
-        args.config = 'configs/overfit_config.yaml'
-    elif args.mode == 'train_c':
+    if args.config is None:
+        if args.mode == 'debug':
+            args.config = 'configs/debug_config.yaml'
+        elif args.mode == 'overfit':
+            args.config = 'configs/overfit_config.yaml'
+        else:
+            args.config = 'configs/default_config.yaml'
+    
+    if args.mode == 'train_c':
         args.config = config_path
+    
+    print(f"using config {args.config}")
 
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)

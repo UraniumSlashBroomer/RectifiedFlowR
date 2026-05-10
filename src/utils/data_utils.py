@@ -2,6 +2,7 @@ import pickle
 import numpy as np
 import os
 import torch
+from .utils import sample
 
 
 def load_CIFAR_batch(filename):
@@ -58,6 +59,26 @@ def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=1000, dty
         "y_val": torch.tensor(y_val, dtype=dtype),
         "X_test": torch.tensor(X_test, dtype=dtype),
         "y_test": torch.tensor(y_test, dtype=dtype)
+    }
+
+    return result_dict
+
+
+def generate_reflow_dataset(model, device, num_training=50000, B=1, T=50, solver='heun'):
+    C, N = model.in_channels, model.img_size
+    z0 = [torch.randn(size=(B, C, N, N)) for _ in range(num_training // B + num_training % B if B is not None else num_training)]
+    z1_hat = [sample(model=model,
+                     B=B, T=T,
+                     noise=z,
+                     solver=solver,
+                     device=device,
+                     with_process=False).squeeze(0) for z in z0]
+    
+    assert z1_hat[0].shape[0] == B
+
+    result_dict = {
+        "X_train": torch.concat(z0),
+        "y_train": torch.concat(z1_hat)
     }
 
     return result_dict

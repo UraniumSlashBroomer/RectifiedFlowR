@@ -12,11 +12,13 @@ model:
 
 train:
   data:
-    dataset: 'CIFAR10'
+    dataset: 'reflow'
     num_training: 10
     num_validation: 10
     batch_size: 2
     drop_last: true
+    reflow_T: 50
+    reflow_solver: 'heun'
   optimizer:
     lr: 0.0003
     weight_decay: 0.00001
@@ -35,4 +37,4 @@ checkpoint:
   img_B: 2
   img_T: 10
   model_save_every_n_epochs: 1
-  saveroot: results/debug/ #do not change it, cause debug mode overwrite full directory! 
+  saveroot: results/debug/ #do not change it, cause debug mode overwrite full directory!

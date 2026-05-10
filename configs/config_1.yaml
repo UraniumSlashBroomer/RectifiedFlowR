@@ -15,10 +15,13 @@ model:
 
 train:
   data:
+    dataset: 'CIFAR10'
     num_training: 49000
     num_validation: 1000
     batch_size: 192
     drop_last: true
+    reflow_T: 50
+    reflow_solver: 'heun'
   optimizer:
     lr: 1.0e-4
     weight_decay: 1.0e-4
@@ -35,6 +38,6 @@ train:
 checkpoint:
   img_save_every_n_epochs: 10
   img_B: 10
-  img_T: 301
+  img_T: 300
   model_save_every_n_epochs: 1
   saveroot: results/
